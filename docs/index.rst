@@ -28,6 +28,7 @@ This Documentation is **currently undergoing a rewrite**. Some pages (marked wit
    :maxdepth: 2
 
    getting_started
+   conversion_guide
    features/logging
    features/server-management
    features/user-management
