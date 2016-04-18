@@ -12,12 +12,14 @@ Setup
 
 To use Commands, you must first install the CommandService to your DiscordClient.
 
-..code-block:: csharp6
+.. code-block:: csharp6
 	
 	_client.UsingCommands(x => {
-		x.CommandChar = '$';
+		x.PrefixChar = '$';
 		x.HelpMode = HelpMode.Public;
 	});
+
+By default, your bot will also respond to @mentions. It is reccomended you leave this feature enabled, and in crowded servers, require a mention to trigger your bot.
 
 Example (Simple)
 ----------------

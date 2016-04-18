@@ -101,7 +101,7 @@ You can `download NAudio from NuGet`_.
 		using (var resampler = new MediaFoundationResampler(MP3Reader, OutFormat)) // Create a Disposable Resampler, which will convert the read MP3 data to PCM, using our Output Format
 		{
 			resampler.ResamplerQuality = 60; // Set the quality of the resampler to 60, the highest quality
-			int blockSize = outFormat.AverageBytesPerSecond / 50; // Establish the size of our AudioBuffer
+			int blockSize = OutFormat.AverageBytesPerSecond / 50; // Establish the size of our AudioBuffer
 			byte[] buffer = new byte[blockSize];
 			int byteCount;
 
