@@ -21,7 +21,7 @@ It is highly recommended that you always use the latest version and please repor
 
 .. _Discord chat: https://discord.gg/0SBTUU1wZTVjAMPx
 
-This Documentation is **currently undergoing a rewrite**. Some pages (marked with a wrench) are not updated, or are not completed yet.
+This Documentation is **currently undergoing a rewrite**. Some pages (marked with a wrench) are not updated, or are not completed yet. Please submit any feedback to ``foxbot#0282`` on Discord.
 
 .. toctree::
    :caption: Documentation

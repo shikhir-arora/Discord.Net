@@ -5,6 +5,18 @@ The `Discord.Net.Commands`_ package DiscordBotClient extends DiscordClient with 
 
 .. _Discord.Net.Commands: https://www.nuget.org/packages/Discord.Net.Commands
 
+Setup
+-----
+
+To use Commands, you must first install the CommandService to your DiscordClient.
+
+..code-block:: csharp6
+	
+	_client.UsingCommands(x => {
+		x.CommandChar = '$';
+		x.HelpMode = HelpMode.Public;
+	});
+
 Example (Simple)
 ----------------
 

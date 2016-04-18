@@ -1,5 +1,5 @@
 //we would run our commands with ~do greet X and ~do bye X
-commands.CreateGroup("do", cgb =>
+_client.GetService<CommandService>().CreateGroup("do", cgb =>
         {
             cgb.CreateCommand("greet")
                     .Alias(new string[] { "gr", "hi" })
@@ -7,7 +7,7 @@ commands.CreateGroup("do", cgb =>
                     .Parameter("GreetedPerson", ParameterType.Required)
                     .Do(async e =>
                     {
-                        await client.SendMessage(e.Channel, e.User.Name + " greets " + e.GetArg("GreetedPerson"));
+                        await e.Channel.SendMessage($"{e.User.Name} greets {e.GetArg("GreetedPerson")}");
                     });
 
             cgb.CreateCommand("bye")
@@ -16,6 +16,6 @@ commands.CreateGroup("do", cgb =>
                     .Parameter("GreetedPerson", ParameterType.Required)
                     .Do(async e =>
                     {
-                        await client.SendMessage(e.Channel, e.User.Name + " says goodbye to " + e.GetArg("GreetedPerson"));
+                        await e.Channel.SendMessage($"{e.User.Name} says goodbye to {e.GetArg("GreetedPerson")}");
                     });
         });
