@@ -133,7 +133,7 @@ Broadcasting with FFmpeg
 	{
 		var process = Process.Start(new ProcessStartInfo { // FFmpeg requires us to spawn a process and hook into its stdout, so we will create a Process
 			FileName = "ffmpeg",
-			Arguments = $"-i {pathOrUrl}" + // Here we provide a list of arguments to feed into FFmpeg. -i means the location of the file/URL it will read from
+			Arguments = $"-i {pathOrUrl} " + // Here we provide a list of arguments to feed into FFmpeg. -i means the location of the file/URL it will read from
 				"-f s16le -ar 48000 -ac 2 pipe:1", // Next, we tell it to output 16-bit 48000Hz PCM, over 2 channels, to stdout. 
 			UseShellExecute = false,
 			RedirectStandardOutput = true // Capture the stdout of the process

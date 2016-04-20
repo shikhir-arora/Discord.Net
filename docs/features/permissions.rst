@@ -40,6 +40,7 @@ Speak                   Voice   Speak in a voice channel.
 UseVoiceActivation      Voice   Use Voice Activation in a text channel (for large channels where PTT is preferred)
 ======================= ======= ==============
 
+
 Each flag is a PermValue; see the section above.
 
 Setting Channel Permissions
@@ -69,6 +70,8 @@ KickMembers             Server  Kick users from the server. They can still rejoi
 ManageRoles             Server  Manage roles on the server, and their permissions.
 ManageChannels          Server  Manage channels that exist on the server (add, remove them)
 ManageServer            Server  Manage the server settings.
+======================= ======= ==============
+
 
 Example
 -------
