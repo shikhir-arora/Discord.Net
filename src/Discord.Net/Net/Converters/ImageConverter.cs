@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Discord.API;
+using Newtonsoft.Json;
 using System;
 using System.IO;
 
@@ -6,7 +7,9 @@ namespace Discord.Net.Converters
 {
     public class ImageConverter : JsonConverter
     {
-        public override bool CanConvert(Type objectType) => objectType == typeof(Stream);
+        public static readonly ImageConverter Instance = new ImageConverter();
+
+        public override bool CanConvert(Type objectType) => true;
         public override bool CanRead => true;
         public override bool CanWrite => true;
 
@@ -17,6 +20,8 @@ namespace Discord.Net.Converters
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
+            if (value is Optional<Stream>)
+                value = (Optional<Stream>)value;
             var stream = value as Stream;
 
             byte[] bytes = new byte[stream.Length - stream.Position];

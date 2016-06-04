@@ -1,5 +1,4 @@
-﻿using Discord.Net.Converters;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.IO;
 
 namespace Discord.API.Rest
@@ -10,7 +9,8 @@ namespace Discord.API.Rest
         public string Name { get; set; }
         [JsonProperty("region")]
         public string Region { get; set; }
-        [JsonProperty("icon"), JsonConverter(typeof(ImageConverter))]
-        public Stream Icon { get; set; }
+
+        [JsonProperty("icon"), Image]
+        public Optional<Stream> Icon { get; set; }
     }
 }

@@ -7,6 +7,6 @@ namespace Discord.API.Rest
         [JsonProperty("id")]
         public ulong Id { get; set; }
         [JsonProperty("position")]
-        public int Position { get; set; }
+        public Optional<int> Position { get; set; }
     }
 }
