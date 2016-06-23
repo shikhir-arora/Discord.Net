@@ -17,7 +17,7 @@ A REST Only ``IDiscordClient`` can be created with the ``DiscordRestClient``.
 Support for WebSockets have not been released yet, and as such, you cannot use any of the WebSocket features in 1.0 yet.
 
 Interfaces
-==========
+----------
 
 Discord.Net 1.0 is heavily Interface Driven. The interfaces you can use are listed below.
 
@@ -157,7 +157,7 @@ Messages
 	**0.9:** ``Message``
 
 Usage
-=====
+-----
 
 Guilds (Servers)
 ----------------
