@@ -2,22 +2,25 @@ using Discord;
 
 class Program
 {
-	static void Main(string[] args) => new Program().Start();
+	static void Main(string[] args) => new Program().Run().GetAwaiter().GetResult();
+	
+	private DiscordSocketClient _client;
 
-	private DiscordClient _client;
-
-	public void Start()
+	public async Task Run()
 	{
-		_client = new DiscordClient();
+		_client = new DiscordSocketClient();
 
-		_client.MessageReceived += async (s, e) =>
-		{
-			if (!e.Message.IsAuthor)
-				await e.Channel.SendMessage(e.Message.Text);
-		};
+		string token = "aaabbbccc";
 
-		_client.ExecuteAndWait(async () => {
-			await _client.Connect("aaaaabbbbbbcccccdddddeeeeefffffggggg")
-		});
+		_client.MessageReceived += async (message) =>
+        {
+            if (!(message.Author.Id == (await _client.GetCurrentUserAsync()).Id))
+                await message.Channel.SendMessageAsync(message.Text);
+        };
+
+		await _client.LoginAsync(TokenType.Bot, token);
+		await _client.ConnectAsync();
+
+		Console.Read();
 	}
 }

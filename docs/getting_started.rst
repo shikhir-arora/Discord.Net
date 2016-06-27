@@ -4,7 +4,7 @@ Getting Started
 Requirements
 ------------
 
-Discord.Net currently requires logging in with a user account, however Discord will soon require the use of Bot Accounts. You can `register a bot account here`_.
+Discord.Net currently requires logging in with a bot account. You can `register a bot account here`_.
 
 Bot Accounts must be added to a server, you must use the `OAuth 2 Flow`_ to add them to servers.
 
@@ -14,12 +14,11 @@ Bot Accounts must be added to a server, you must use the `OAuth 2 Flow`_ to add 
 Installation
 ------------
 
-You can get Discord.Net from NuGet:
+~~You can get Discord.Net from NuGet:~~
+
+Leaving this as a placeholder, however **you must compile from source.**
 
 * `Discord.Net`_
-* `Discord.Net.Commands`_
-* `Discord.Net.Modules`_
-* `Discord.Net.Audio`_
 
 If you have trouble installing from NuGet, try installing dependencies manually.
 
@@ -66,26 +65,32 @@ That might have been a lot, so let's go through each line.
 
 Next, we create the Program class, as you would generally do in C#.
 
-``static void Main(string[] args) => new Program().Start();`` - It's not good practice to run all of your code in one static method, so we create a new non-static instance of ``Program`` and run the ``Start`` method.
+``static void Main(string[] args) => new Program().Run().GetAwaiter().GetResult();`` - It's not good practice to run all of your code in one static method, so we create a new non-static instance of ``Program`` and run the ``Run`` task. We use ``GetAwaiter().GetResult();`` because ``Run`` is an async Task, and we want our program to block until that task is completed.
 
-``private DiscordClient _client;`` - Here we define the main ``DiscordClient`` that we will be using in our project. It's standard convention to name the private DiscordClient ``_client``, and I encourage that you do so also.
+``private DiscordSocketClient _client;`` - Here we define the main ``DiscordSocketClient`` that we will be using in our project. It's standard convention to name the private DiscordClient ``_client``, and I encourage that you do so also.
 
-``public void Start()`` - As explained above, it's not good practice to run everything out of Main, so here is our new Main method.
+.. note:: 
+	In versions before 1.0, you would normally use ``DiscordClient``, and you may notice that ``DiscordClient`` still exists. However, the base DiscordClient functions only to make REST calls, and cannot perform many major functions of a Discord Bot, such as receiving messages.
 
-``_client = new DiscordClient();`` - Here, we define ``_client`` as a new ``DiscordClient``, so we can begin to use it.
+``public async Task Run()`` - As explained above, it's not good practice to run everything out of Main, so here is our new Main method. We mark this as an ``async Task`` so that we can run asynchronus code inside of it.
 
-``_client.MessageReceived += async (s, e) => {`` - This is a lambda, a feature which allows us to define functions or handlers inline, without creating a new method. Here, we are hooking into the ``MessageReceived`` event on the DiscordClient. The ``async (s, e)`` indicates that the lambda will be an async function, and we are passing two parameters, s(ender) and e(vent args) into it.
+``_client = new DiscordSocketClient();`` - Here, we define ``_client`` as a new ``DiscordSocketClient``, so we can begin to use it.
 
-``if (!e.Message.IsAuthor)`` - This ensures that we did not create the message that was received. This helps to keep us from creating an infinite echo bot.
+``string token = "aaabbbccc";`` Here, we are storing our token for use in the login method. There is no advantage to storing your token into a string here, except for that it helps to prevent clutter.
 
-``await e.Channel.SendMessage(e.Message.Text)`` - Here, we are sending a message to the channel the message was received in. The contents of the message we are sending is identical to that of the message we received.
+``_client.MessageReceived += async (message) => {`` - This is a lambda, a feature which allows us to define functions or handlers inline, without creating a new method. Here, we are hooking into the ``MessageReceived`` "event" on the DiscordSocketClient. The ``async (message)`` indicates that the lambda will be an async function, and we are passing a single parameter, message into it. While yhou are subscribing to an event, you are not limited to the standard EventHandler pattern, and you no longer need to accept ``sender`` as an argument.
+
+``if (!(message.Author.Id == (await _client.GetCurrentUserAsync()).Id))`` - This ensures that we did not create the message that was received. This helps to keep us from creating an infinite echo bot.
+
+``await message.Channel.SendMessageAsync(Message.Text)`` - Here, we are sending a message to the channel the message was received in. The contents of the message we are sending is identical to that of the message we received.
 
 ``};`` - Close up the lambda
 
-``_client.ExecuteAndWait(async () => {`` - This invokes the ``ExecuteAndWait`` function of the DiscordClient, which allows us to run async code in a non-async method, and block the Console app until the Discord Client disconnects. Inside this function, we are creating an async lambda with no parameters (ExecuteAndWait takes an ``Action``, so we cannot use and parameters).
+``await _client.LoginAsync(TokenType.Bot, token)`` In 1.0, you now need to call a login function and pass in your token. 
 
-``await _client.Connect("aaabbbccc");`` - Next, we are going to connect our client, using the bot token that Discord provides us. If you are unsure of how to access your token, `see this image`_.
+``await _client.ConnectAsync();`` - Finally, we connect the bot to Discord. 
 
-Finally, we close up our lambdas and program.
+.. warning::
+	In previous versions of Discord.Net, you had to hook into the Ready and GuildAvailable events separately before you could ensure your bot was online. 
 
-.. _see this image: http://i.foxbot.me/4rj5u.png
+	In 1.0, the ``ConnectAsync`` method does not return until the ``Ready`` event has been processed. By default, the ``ConnectAsync`` method also waits until all guilds have been streamed in. You can disable this feature by passing ``false`` into ``ConnectAsync``.
