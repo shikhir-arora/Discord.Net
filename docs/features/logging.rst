@@ -1,37 +1,23 @@
 Logging
 =======
 
-|outdated|
+|updated|
 
-Discord.Net will log all of its events/exceptions using a built-in LogManager.
-This LogManager can be accessed through DiscordClient.Log
+Discord.Net will log all of its events/exceptions using an internal Logger.
+
+Messages can be accessed through the ``IDiscordClient.Log`` Event.
 
 Usage
 -----
 
-To handle Log Messages through Discord.Net's Logger, you must hook into the Log.Message<LogMessageEventArgs> Event.
+To handle Log Messages through Discord.Net's Logger, hook into the ``Log`` event. It is raised with a single parameter, ``LogMessage``.
 
 The LogManager does not provide a string-based result for the message, you must put your own message format together using the data provided through LogMessageEventArgs
 See the Example for a snippet of logging.
-
-Logging Your Own Data
----------------------
-
-The LogManager included in Discord.Net can also be used to log your own messages.
-
-You can use DiscordClient.Log.Log(LogSeverity, Source, Message, Exception), or one of the shortcut helpers, to log data.
-
-Example:
-.. code-block:: c#
-
-    _client.MessageReceived += async (s, e) {
-        // Log a new Message with Severity Info, Sourced from 'MessageReceived', with the Message Contents.
-        _client.Log.Info("MessageReceived", e.Message.Text, null);
-    };
 
 Example
 -------
 
 .. literalinclude:: /samples/logging.cs
-   :language: c#
+   :language: csharp6
    :tab-width: 2

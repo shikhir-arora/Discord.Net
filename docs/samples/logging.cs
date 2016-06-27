@@ -1,20 +1,19 @@
-class Program
+using Discord;
+
+public class Program
 {
-    private static DiscordBotClient _client;
-    static void Main(string[] args)
+    // Note: This is the light client, it only supports REST calls.
+    private DiscordClient _client;
+    static void Main(string[] args) => new Program().Start().GetAwaiter().GetResult();
+    
+    public async Task Start()
     {
-        var client = new DiscordClient(x =>
-        {
+        _client = new DiscordClient(new DiscordConfig() {
 			LogLevel = LogSeverity.Info
-		});
-
-        _client.Log.Message += (s, e) => Console.WriteLine($"[{e.Severity}] {e.Source}: {e.Message}");
-
-        client.ExecuteAndWait(async () =>
-        {
-            await client.Connect("discordtest@email.com", "Password123");
-            if (!client.Servers.Any())
-                await client.AcceptInvite("aaabbbcccdddeee");
         });
+
+        _client.Log += (message) => Console.WriteLine($"[{message.Severity}] {message.Source} -> {message.Message}");
+
+        await _client.LoginAsync(TokenType.Bot, "bot token");
     }
 }
