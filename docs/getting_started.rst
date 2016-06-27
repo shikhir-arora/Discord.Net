@@ -14,9 +14,9 @@ Bot Accounts must be added to a server, you must use the `OAuth 2 Flow`_ to add 
 Installation
 ------------
 
-~~You can get Discord.Net from NuGet:~~
+You can **not** get Discord.Net from NuGet:
 
-Leaving this as a placeholder, however **you must compile from source.**
+Leaving the below link as a placeholder, however **you must compile from source.**
 
 * `Discord.Net`_
 
@@ -24,16 +24,13 @@ If you have trouble installing from NuGet, try installing dependencies manually.
 
 .. warning::
 	
-	The latest versions of Discord.Net on NuGet are outdated, and you may run into performance issues. It is reccomended that you pull the latest source from `GitHub`_
+	The versions of Discord.Net on NuGet are behind the versions this documentation is written for. Compile from source.
 
 You can also pull the latest source from `GitHub`_ 
 
 As an alternative, precompiled binaries are available on our `Continuous Integration`_ server.
 
 .. _Discord.Net: https://www.nuget.org/packages/Discord.Net
-.. _Discord.Net.Commands: https://www.nuget.org/packages/Discord.Net.Commands
-.. _Discord.Net.Modules: https://www.nuget.org/packages/Discord.Net.Modules
-.. _Discord.Net.Modules: https://www.nuget.org/packages/Discord.Net.Audio
 .. _GitHub: https://github.com/RogueException/Discord.Net/
 .. _Continuous Integration: https://ci.appveyor.com/project/foxbot/discord-net/history
 
