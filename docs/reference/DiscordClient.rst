@@ -1,6 +1,8 @@
 DiscordClient
 =============
 
+|outdated|
+
 .. warning::
 
 	I've decided this is a horrible idea to make, considering that we have the `MSDN Docs`_. I'm just leaving the page here in case I change my mind.

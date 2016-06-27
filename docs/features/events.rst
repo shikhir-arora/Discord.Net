@@ -1,6 +1,8 @@
 Events
 ======
 
+|outdated|
+
 Usage
 -----
 Messages from the Discord server are exposed via events on the DiscordClient class and follow the standard EventHandler<EventArgs> C# pattern. 

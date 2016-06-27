@@ -1,6 +1,8 @@
 Server Management
 =================
 
+|outdated|
+
 Discord.Net will allow you to manage most settings of a Discord server.
 
 Usage

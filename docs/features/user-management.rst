@@ -1,6 +1,8 @@
 User Management
 ===============
 
+|outdated|
+
 Banning
 -------
 

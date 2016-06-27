@@ -1,6 +1,8 @@
 Logging
 =======
 
+|outdated|
+
 Discord.Net will log all of its events/exceptions using a built-in LogManager.
 This LogManager can be accessed through DiscordClient.Log
 

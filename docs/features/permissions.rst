@@ -1,6 +1,8 @@
 Permissions
 ===========
 
+|outdated|
+
 There are two types of permissions: *Channel Permissions* and *Server Permissions*.
 
 Permission Overrides

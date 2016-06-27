@@ -1,6 +1,8 @@
 Voice
 =====
 
+|outdated|
+
 Installation
 ------------
 
