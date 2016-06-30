@@ -88,5 +88,5 @@ Examples:
         // See if they changed Voice channels
         if (before.VoiceChannel == after.VoiceChannel) return;
 
-        await logChannel.SendMessage($"User {user.Username} changed voice channels!");
+        await logChannel.SendMessageAsync($"User {user.Username} changed voice channels!");
     };

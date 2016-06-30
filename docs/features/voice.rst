@@ -1,7 +1,15 @@
 Voice
 =====
 
-|outdated|
+|outdated|  
+
+|incomplete|  
+
+|breaking|
+
+.. warning::
+	
+	Audio in 1.0 is not complete. Most of the documentation below is untested.
 
 Installation
 ------------
@@ -10,9 +18,9 @@ Before setting up the AudioService, you must first install the package `from NuG
 
 Add the package to your solution, and then import the namespace ``Discord.Audio``.
 
-Discord.Audio also relies on the Opus Audio Library for encoding audio. You must acquire a compiled binary of Opus, and place it in the directory your project runs from (/ on dnx, /bin/debug on net45). A 32-bit binary is `available for your convienence`_.
-
 You will also need libsodium for voice encryption. You must acquire a compiled binary of libsodium, and place it in the directory your project runs from. A precompiled binary is also `available here`_. You may also find 64-bit/linux releases `from here`_.
+
+Optionally, Discord.Audio also relies on the Opus Audio Library for encoding audio. Opus binaries are only necessary if you will be sending PCM data to Discord. You must acquire a compiled binary of Opus, and place it in the directory your project runs from (/ on dnx, /bin/debug on net45). A 32-bit binary is `available for your convienence`_.
 
 .. _from NuGet: https://www.nuget.org/packages/Discord.Net.Audio/0.9.0-rc3
 .. _GitHub: https://github.com/RogueException/Discord.Net/tree/master/src/Discord.Net.Audio
@@ -23,28 +31,29 @@ You will also need libsodium for voice encryption. You must acquire a compiled b
 Setup
 -----
 
-To use audio, you must install the AudioService to your DiscordClient.
+|updated-sec|
+
+To use audio, you must configure your DiscordSocketClient to use Audio.
 
 .. code-block:: csharp6
 	
-	var _client = new DiscordClient();
+	_client = new DiscordSocketClient(new DiscordSocketConfig() { AudioMode = AudioMode.Outgoing });
 
-	_client.UsingAudio(x => // Opens an AudioConfigBuilder so we can configure our AudioService
-	{
-		x.Mode = AudioMode.Outgoing; // Tells the AudioService that we will only be sending audio
-	});
+For most music bots, you will only need ``AudioMode.Outgoing``. If you need to receive audio, set your AudioMode to ``AudioMode.Incoming`` or ``AudioMode.Both``.
 
 Joining a Channel
 -----------------
+
+|updated-sec|
 
 Joining Voice Channels is pretty straight-forward, and is required to send Audio. This will also allow us to get an IAudioClient, which we will later use to send Audio.
 
 .. code-block:: csharp6
 	
-	var voiceChannel = _client.FindServers("Music Bot Server").FirstOrDefault().VoiceChannels.FirstOrDefault(); // Finds the first VoiceChannel on the server 'Music Bot Server'
-
-	var _vClient = await _client.GetService<AudioService>() // We use GetService to find the AudioService that we installed earlier. In previous versions, this was equivelent to _client.Audio()
-		.Join(VoiceChannel); // Join the Voice Channel, and return the IAudioClient.
+	// Get the audio channel
+	var channel = await _client.GetChannelAsync(150482537465118721) as IVoiceChannel;
+	// Get the IAudioClient by calling the JoinAsync method.
+	var _audio = await channel.JoinAsync();
 
 The client will sustain a connection to this channel until it is kicked, disconnected from Discord, or told to Disconnect.
 
@@ -53,35 +62,40 @@ The IAudioClient
 
 The IAudioClient is used to connect/disconnect to/from a Voice Channel, and to send audio to that Voice Channel.
 
-.. function:: IAudioClient.Disconnect();
+.. function:: Func<Task> IAudioClient.Connected
+	
+	Event raised when the audio client connects
+
+.. function:: Func<Exception, Task> IAudioClient.Disconnected
+	
+	Event raised when the audio client disconnects, raised with the exception that caused the disconnect.
+
+.. function:: Func<int before, int after, Task> LatencyUpdated
+	
+	Raised when the Latency field is updated
+
+.. function:: IAudioClient.DisconnectAsync();
 	
 	Disconnects the IAudioClient from the Voice Server.
 
+.. function:: CreateOpusStream(int samplesPerFrame, int bufferSize = 4000)
 
-.. function:: IAudioClient.Join(Channel);
-	
-	Moves the IAudioClient to another channel on the Voice Server, or starts a connection if one has already been terminated.
+	Returns an RTPWriteStream that allows you to send DCA (Opus Audio) to Discord.
 
-.. note::
+.. function:: CreatePCMStream (int samplesPerFrame, int bufferSize = 4000)
 
-	Because versions previous to 0.9 do not discretely differentiate between Text and Voice Channels, you may want to ensure that users cannot request the audio client to join a text channel, as this will throw an exception, leading to potentially unexpected behavior
+	Returns an OpsuEncodeStream that allows you to send PCM data to Discord. Requires the Opus library.
  
-.. function:: IAudioClient.Wait();
-	
-	Blocks the current thread until the sending audio buffer has cleared out. 
 
-.. function:: IAudioClient.Clear();
-	
-	Clears the sending audio buffer.
-
-.. function:: IAudioClient.Send(byte[] data, int offset, int count);
-	
-	Adds a stream of data to the Audio Client's internal buffer, to be sent to Discord. Follows the standard c# Stream.Send() format.
 
 Broadcasting
 ------------
 
-There are multiple approaches to broadcasting audio. Discord.Net will convert your audio packets into Opus format, so the only work you need to do is converting your audio into a format that Discord will accept. The format Discord takes is 16-bit 48000Hz PCM.
+|updated-sec|
+
+There are multiple approaches to broadcasting audio. Discord.Net can convert your PCM data into Opus format, so the only work you need to do is converting your audio into a format that our encoder will accept. The format the OpusEncodeStream takes is 16-bit 48000Hz PCM.
+
+Alternatively, you may send DCA audio to Discord, which is audio already encoded to the Opus format.
 
 Broadcasting with NAudio
 ------------------------
@@ -168,19 +182,7 @@ Broadcasting with FFmpeg
 Multi-Server Broadcasting
 -------------------------
 
-.. warning:: Multi-Server broadcasting is not supported by Discord, will cause performance issues for you, and is not encouraged. Proceed with caution.
-
-To prepare for Multi-Server Broadcasting, you must first enable it in your config.
-
-.. code-block::csharp6
-	
-	_client.UsingAudio(x => 
-	{
-		x.Mode = AudioMode.Outgoing;
-		x.EnableMultiserver = true;	// Enable Multiserver
-	});
-
-From here on, it is as easy as creating an IAudioClient for each server you want to join. See the sections on broadcasting to proceed.
+Multi-Server Broadcasting is supported out-of-box. Just create an ``IAudioClient`` for each server you wish to broadcast to.
 
 
 Receiving

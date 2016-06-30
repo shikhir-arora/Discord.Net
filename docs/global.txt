@@ -1,6 +1,10 @@
 .. |stub| unicode:: U+1F527
 .. |stub-desc| replace:: This page is a placeholder and has not been written yet. It should be coming soon!
 .. |outdated| replace:: **This page is currently out-of-date. The information below may be inaccurate.**
+.. |outdated-sec| replace:: **This section of the page is currently out-of-date. The information below may be inaccurate.**
 .. |incomplete| replace:: **This page is incomplete. While the information below is accurate, it should be noted that it is not thorough.**
+.. |incomplete-sec| replace:: **This section is incomplete. While the information below is accurate, it should be noted that it is not thorough.**
 .. |updated| replace:: **This page has been updated to Discord.Net 1.0. Information below is accurate.**
+.. |updated-sec| replace:: **This section has been updated to Discord.Net 1.0. Information below is accurate.**
 .. |breaking| replace:: **Information documented on this page is subject to change, and is not guaranteed to work forever.**
+.. |breaking-sec| replace:: **Information in this section is subject to change, and is not guaranteed to work in later versions.**
