@@ -12,10 +12,11 @@ class Program
 
 		string token = "aaabbbccc";
 
+		// To create commands the /right/ way, please see the 'commands' section.
 		_client.MessageReceived += async (message) =>
         {
-            if (!(message.Author.Id == (await _client.GetCurrentUserAsync()).Id))
-                await message.Channel.SendMessageAsync(message.Text);
+            if (message.Text == "!ping")
+            	await message.Channel.SendMessageAsync("pong");
         };
 
 		await _client.LoginAsync(TokenType.Bot, token);

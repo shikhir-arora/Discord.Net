@@ -77,9 +77,9 @@ Next, we create the Program class, as you would generally do in C#.
 
 ``_client.MessageReceived += async (message) => {`` - This is a lambda, a feature which allows us to define functions or handlers inline, without creating a new method. Here, we are hooking into the ``MessageReceived`` "event" on the DiscordSocketClient. The ``async (message)`` indicates that the lambda will be an async function, and we are passing a single parameter, message into it. While yhou are subscribing to an event, you are not limited to the standard EventHandler pattern, and you no longer need to accept ``sender`` as an argument.
 
-``if (!(message.Author.Id == (await _client.GetCurrentUserAsync()).Id))`` - This ensures that we did not create the message that was received. This helps to keep us from creating an infinite echo bot.
+``if (message.Text == "!ping")`` - Here we setup a basic Ping command.
 
-``await message.Channel.SendMessageAsync(Message.Text)`` - Here, we are sending a message to the channel the message was received in. The contents of the message we are sending is identical to that of the message we received.
+``await message.Channel.SendMessageAsync("pong")`` - Here, we send a pong back.
 
 ``};`` - Close up the lambda
 
