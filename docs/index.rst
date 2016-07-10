@@ -27,5 +27,7 @@ This Documentation is **currently undergoing a rewrite**. Some pages (marked wit
    features/user-management
    features/permissions
    features/commands
+   features/modules
+   features/type-readers
    features/voice
    features/events
