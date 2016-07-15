@@ -1,5 +1,4 @@
 ﻿using Discord.API.Rest;
-using Discord.Extensions;
 using Discord.Logging;
 using Discord.Net;
 using Discord.Net.Queue;
@@ -10,35 +9,44 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace Discord
 {
     public class DiscordClient : IDiscordClient
     {
-        public event Func<LogMessage, Task> Log;
-        public event Func<Task> LoggedIn, LoggedOut;
+        private readonly object _eventLock = new object();
 
-        internal readonly Logger _discordLogger, _restLogger, _queueLogger;
+        public event Func<LogMessage, Task> Log { add { _logEvent.Add(value); } remove { _logEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<LogMessage, Task>> _logEvent = new AsyncEvent<Func<LogMessage, Task>>();
+
+        public event Func<Task> LoggedIn { add { _loggedInEvent.Add(value); } remove { _loggedInEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<Task>> _loggedInEvent = new AsyncEvent<Func<Task>>();
+        public event Func<Task> LoggedOut { add { _loggedOutEvent.Add(value); } remove { _loggedOutEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<Task>> _loggedOutEvent = new AsyncEvent<Func<Task>>();
+
+        internal readonly ILogger _clientLogger, _restLogger, _queueLogger;
         internal readonly SemaphoreSlim _connectionLock;
-        internal readonly LogManager _log;
         internal readonly RequestQueue _requestQueue;
         internal bool _isDisposed;
         internal SelfUser _currentUser;
+        private bool _isFirstLogSub;
 
+        public API.DiscordApiClient ApiClient { get; }
+        internal LogManager LogManager { get; }
         public LoginState LoginState { get; private set; }
-        public API.DiscordApiClient ApiClient { get; private set; }
 
         /// <summary> Creates a new REST-only discord client. </summary>
-        public DiscordClient()
-            : this(new DiscordConfig()) { }
+        public DiscordClient() : this(new DiscordConfig()) { }
         /// <summary> Creates a new REST-only discord client. </summary>
         public DiscordClient(DiscordConfig config)
         {
-            _log = new LogManager(config.LogLevel);
-            _log.Message += async msg => await Log.RaiseAsync(msg).ConfigureAwait(false);
-            _discordLogger = _log.CreateLogger("Discord");
-            _restLogger = _log.CreateLogger("Rest");
-            _queueLogger = _log.CreateLogger("Queue");
+            LogManager = new LogManager(config.LogLevel);
+            LogManager.Message += async msg => await _logEvent.InvokeAsync(msg).ConfigureAwait(false);
+            _clientLogger = LogManager.CreateLogger("Client");
+            _restLogger = LogManager.CreateLogger("Rest");
+            _queueLogger = LogManager.CreateLogger("Queue");
+            _isFirstLogSub = true;
 
             _connectionLock = new SemaphoreSlim(1, 1);
 
@@ -49,8 +57,10 @@ namespace Discord
                 if (bucket == null && id != null)
                     await _queueLogger.WarningAsync($"Unknown rate limit bucket \"{id ?? "null"}\"").ConfigureAwait(false);
             };
-            
-            ApiClient = new API.DiscordApiClient(config.RestClientProvider, (config as DiscordSocketConfig)?.WebSocketProvider, requestQueue: _requestQueue);
+
+            var restProvider = config.RestClientProvider;
+            var webSocketProvider = (this is DiscordSocketClient) ? (config as DiscordSocketConfig)?.WebSocketProvider : null; //TODO: Clean this check
+            ApiClient = new API.DiscordApiClient(restProvider, webSocketProvider, requestQueue: _requestQueue);
             ApiClient.SentRequest += async (method, endpoint, millis) => await _restLogger.VerboseAsync($"{method} {endpoint}: {millis} ms").ConfigureAwait(false);
         }
 
@@ -66,6 +76,12 @@ namespace Discord
         }
         private async Task LoginInternalAsync(TokenType tokenType, string token, bool validateToken)
         {
+            if (_isFirstLogSub)
+            {
+                _isFirstLogSub = false;
+                await WriteInitialLog().ConfigureAwait(false);
+            }
+
             if (LoginState != LoginState.LoggedOut)
                 await LogoutInternalAsync().ConfigureAwait(false);
             LoginState = LoginState.LoggingIn;
@@ -96,7 +112,7 @@ namespace Discord
                 throw;
             }
 
-            await LoggedIn.RaiseAsync().ConfigureAwait(false);
+            await _loggedInEvent.InvokeAsync().ConfigureAwait(false);
         }
         protected virtual Task OnLoginAsync() => Task.CompletedTask;
 
@@ -123,7 +139,7 @@ namespace Discord
 
             LoginState = LoginState.LoggedOut;
 
-            await LoggedOut.RaiseAsync().ConfigureAwait(false);
+            await _loggedOutEvent.InvokeAsync().ConfigureAwait(false);
         }
         protected virtual Task OnLogoutAsync() => Task.CompletedTask;
 
@@ -187,11 +203,23 @@ namespace Discord
             return null;
         }
         /// <inheritdoc />
-        public virtual async Task<IReadOnlyCollection<IUserGuild>> GetGuildsAsync()
+        public virtual async Task<IReadOnlyCollection<IUserGuild>> GetGuildSummariesAsync()
         {
             var models = await ApiClient.GetMyGuildsAsync().ConfigureAwait(false);
             return models.Select(x => new UserGuild(this, x)).ToImmutableArray();
-
+        }
+        /// <inheritdoc />
+        public virtual async Task<IReadOnlyCollection<IGuild>> GetGuildsAsync()
+        {
+            var summaryModels = await ApiClient.GetMyGuildsAsync().ConfigureAwait(false);
+            var guilds = ImmutableArray.CreateBuilder<IGuild>(summaryModels.Count);
+            foreach (var summaryModel in summaryModels)
+            {
+                var guildModel = await ApiClient.GetGuildAsync(summaryModel.Id).ConfigureAwait(false);
+                if (guildModel != null)
+                    guilds.Add(new Guild(this, guildModel));
+            }
+            return guilds.ToImmutable();
         }
         /// <inheritdoc />
         public virtual async Task<IGuild> CreateGuildAsync(string name, IVoiceRegion region, Stream jpegIcon = null)
@@ -249,15 +277,39 @@ namespace Discord
             return models.Select(x => new VoiceRegion(x)).Where(x => x.Id == id).FirstOrDefault();
         }
 
-        internal void Dispose(bool disposing)
+        internal virtual void Dispose(bool disposing)
         {
             if (!_isDisposed)
                 _isDisposed = true;
+            ApiClient.Dispose();
         }
         /// <inheritdoc />
         public void Dispose() => Dispose(true);
-        
+
+        private async Task WriteInitialLog()
+        {
+            if (this is DiscordSocketClient)
+                await _clientLogger.InfoAsync($"DiscordSocketClient v{DiscordConfig.Version} (Gateway v{DiscordConfig.GatewayAPIVersion}, {DiscordConfig.GatewayEncoding})").ConfigureAwait(false);
+            else
+                await _clientLogger.InfoAsync($"DiscordClient v{DiscordConfig.Version}").ConfigureAwait(false);
+            await _clientLogger.VerboseAsync($"Runtime: {RuntimeInformation.FrameworkDescription.Trim()} ({ToArchString(RuntimeInformation.ProcessArchitecture)})").ConfigureAwait(false);
+            await _clientLogger.VerboseAsync($"OS: {RuntimeInformation.OSDescription.Trim()} ({ToArchString(RuntimeInformation.OSArchitecture)})").ConfigureAwait(false);
+            await _clientLogger.VerboseAsync($"Processors: {Environment.ProcessorCount}").ConfigureAwait(false);
+        }
+
+        private static string ToArchString(Architecture arch)
+        {
+            switch (arch)
+            {
+                case Architecture.X64: return "x64";
+                case Architecture.X86: return "x86";
+                default: return arch.ToString();
+            }
+        }
+
         ConnectionState IDiscordClient.ConnectionState => ConnectionState.Disconnected;
+        ILogManager IDiscordClient.LogManager => LogManager;
+
         Task IDiscordClient.ConnectAsync() { throw new NotSupportedException(); }
         Task IDiscordClient.DisconnectAsync() { throw new NotSupportedException(); }
     }

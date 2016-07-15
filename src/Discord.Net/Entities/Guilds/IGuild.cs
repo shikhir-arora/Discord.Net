@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Discord.API.Rest;
+using Discord.Audio;
 
 namespace Discord
 {
@@ -13,7 +14,12 @@ namespace Discord
         int AFKTimeout { get; }
         /// <summary> Returns true if this guild is embeddable (e.g. widget) </summary>
         bool IsEmbeddable { get; }
-        int VerificationLevel { get; }
+        /// <summary> Gets the default message notifications for users who haven't explicitly set their notification settings. </summary>
+        DefaultMessageNotifications DefaultMessageNotifications { get; }
+        /// <summary> Gets the level of mfa requirements a user must fulfill before being allowed to perform administrative actions in this guild. </summary>
+        MfaLevel MfaLevel { get; }
+        /// <summary> Gets the level of requirements a user must fulfill before being allowed to post messages in this guild. </summary>
+        VerificationLevel VerificationLevel { get; }
         /// <summary> Returns the url to this guild's icon, or null if one is not set. </summary>
         string IconUrl { get; }
         /// <summary> Returns the url to this guild's splash image, or null if one is not set. </summary>
@@ -32,6 +38,8 @@ namespace Discord
         /// <summary> Gets the id of the region hosting this guild's voice channels. </summary>
         string VoiceRegionId { get; }
 
+        /// <summary> Gets the IAudioClient currently associated with this guild. </summary>
+        IAudioClient AudioClient { get; }
         /// <summary> Gets the built-in role containing all users in this guild. </summary>
         IRole EveryoneRole { get; }
         /// <summary> Gets a collection of all custom emojis for this guild. </summary>

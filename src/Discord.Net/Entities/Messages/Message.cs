@@ -16,17 +16,17 @@ namespace Discord
         private long? _editedTimestampTicks;
 
         public bool IsTTS { get; private set; }
-        public string RawText { get; private set; }
         public string Text { get; private set; }
+        public bool IsPinned { get; private set; }
         
         public IMessageChannel Channel { get; }
         public IUser Author { get; }
         
-        public ImmutableArray<Attachment> Attachments { get; private set; }
-        public ImmutableArray<Embed> Embeds { get; private set; }
-        public ImmutableArray<ulong> MentionedChannelIds { get; private set; }
-        public ImmutableArray<ulong> MentionedRoleIds { get; private set; }
-        public ImmutableArray<User> MentionedUsers { get; private set; }
+        public IReadOnlyCollection<IAttachment> Attachments { get; private set; }
+        public IReadOnlyCollection<IEmbed> Embeds { get; private set; }
+        public IReadOnlyCollection<ulong> MentionedChannelIds { get; private set; }
+        public IReadOnlyCollection<IRole> MentionedRoles { get; private set; }
+        public IReadOnlyCollection<IUser> MentionedUsers { get; private set; }
 
         public override DiscordClient Discord => (Channel as Entity<ulong>).Discord;
         public DateTimeOffset? EditedTimestamp => DateTimeUtils.FromTicks(_editedTimestampTicks);
@@ -40,9 +40,9 @@ namespace Discord
 
             if (channel is IGuildChannel)
             {
-                MentionedUsers = ImmutableArray.Create<User>();
+                MentionedUsers = ImmutableArray.Create<IUser>();
                 MentionedChannelIds = ImmutableArray.Create<ulong>();
-                MentionedRoleIds = ImmutableArray.Create<ulong>();
+                MentionedRoles = ImmutableArray.Create<IRole>();
             }
 
             Update(model, UpdateSource.Creation);
@@ -57,13 +57,15 @@ namespace Discord
 
             if (model.IsTextToSpeech.IsSpecified)
                 IsTTS = model.IsTextToSpeech.Value;
+            if (model.Pinned.IsSpecified)
+                IsPinned = model.Pinned.Value;
             if (model.Timestamp.IsSpecified)
                 _timestampTicks = model.Timestamp.Value.UtcTicks;
             if (model.EditedTimestamp.IsSpecified)
                 _editedTimestampTicks = model.EditedTimestamp.Value?.UtcTicks;
-            if (model.IsMentioningEveryone.IsSpecified)
-                _isMentioningEveryone = model.IsMentioningEveryone.Value;
-            
+            if (model.MentionEveryone.IsSpecified)
+                _isMentioningEveryone = model.MentionEveryone.Value;
+
             if (model.Attachments.IsSpecified)
             {
                 var value = model.Attachments.Value;
@@ -103,24 +105,20 @@ namespace Discord
                     MentionedUsers = ImmutableArray.Create(mentions);
                 }
                 else
-                    MentionedUsers = ImmutableArray.Create<User>();
+                    MentionedUsers = ImmutableArray.Create<IUser>();
             }
 
             if (model.Content.IsSpecified)
             {
-                RawText = model.Content.Value;
-
-                if (Channel is IGuildChannel)
+                var text = model.Content.Value;
+                
+                if (guildChannel != null)
                 {
-                    Text = MentionUtils.CleanUserMentions(RawText, MentionedUsers);
-                    MentionedChannelIds = MentionUtils.GetChannelMentions(RawText);
-                    var mentionedRoleIds = MentionUtils.GetRoleMentions(RawText);
-                    if (_isMentioningEveryone)
-                        mentionedRoleIds = mentionedRoleIds.Add(guildChannel.Guild.EveryoneRole.Id);
-                    MentionedRoleIds = mentionedRoleIds;
+                    MentionedUsers = MentionUtils.GetUserMentions(text, Channel, MentionedUsers);
+                    MentionedChannelIds = MentionUtils.GetChannelMentions(text, guildChannel.Guild);
+                    MentionedRoles = MentionUtils.GetRoleMentions(text, guildChannel.Guild);
                 }
-                else
-                    Text = RawText;
+                Text = text;
             }
         }
 
@@ -144,6 +142,7 @@ namespace Discord
                 model = await Discord.ApiClient.ModifyMessageAsync(guildChannel.Guild.Id, Channel.Id, Id, args).ConfigureAwait(false);
             else
                 model = await Discord.ApiClient.ModifyDMMessageAsync(Channel.Id, Id, args).ConfigureAwait(false);
+                
             Update(model, UpdateSource.Rest);
         }        
         public async Task DeleteAsync()
@@ -154,14 +153,33 @@ namespace Discord
             else
                 await Discord.ApiClient.DeleteDMMessageAsync(Channel.Id, Id).ConfigureAwait(false);
         }
+        public async Task PinAsync()
+        {
+            await Discord.ApiClient.AddPinAsync(Channel.Id, Id).ConfigureAwait(false);
+        }
+        public async Task UnpinAsync()
+        {
+            await Discord.ApiClient.RemovePinAsync(Channel.Id, Id).ConfigureAwait(false);
+        }
+        
+        public string Resolve(int startIndex, int length, UserResolveMode userMode = UserResolveMode.NameOnly)
+            => Resolve(Text.Substring(startIndex, length), userMode);
+        public string Resolve(UserResolveMode userMode = UserResolveMode.NameOnly)
+            => Resolve(Text, userMode);
+        
+        private string Resolve(string text, UserResolveMode userMode = UserResolveMode.NameOnly)
+        {
+            var guild = (Channel as IGuildChannel)?.Guild;
+            text = MentionUtils.ResolveUserMentions(text, Channel, MentionedUsers, userMode);
+            if (guild != null)
+            {
+                text = MentionUtils.ResolveChannelMentions(text, guild);
+                text = MentionUtils.ResolveRoleMentions(text, guild, MentionedRoles);
+            }
+            return text;
+        }
 
         public override string ToString() => Text;
-        private string DebuggerDisplay => $"{Author}: {Text}{(Attachments.Length > 0 ? $" [{Attachments.Length} Attachments]" : "")}";
-
-        IReadOnlyCollection<Attachment> IMessage.Attachments => Attachments;
-        IReadOnlyCollection<IEmbed> IMessage.Embeds => Embeds;
-        IReadOnlyCollection<ulong> IMessage.MentionedChannelIds => MentionedChannelIds;
-        IReadOnlyCollection<ulong> IMessage.MentionedRoleIds => MentionedRoleIds;
-        IReadOnlyCollection<IUser> IMessage.MentionedUsers => MentionedUsers;
+        private string DebuggerDisplay => $"{Author}: {Text}{(Attachments.Count > 0 ? $" [{Attachments.Count} Attachments]" : "")}";
     }
 }

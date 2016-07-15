@@ -1,13 +1,16 @@
-﻿using Discord.Data;
+﻿using Discord.Audio;
 using Discord.Extensions;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ChannelModel = Discord.API.Channel;
+using EmojiUpdateModel = Discord.API.Gateway.GuildEmojiUpdateEvent;
 using ExtendedModel = Discord.API.Gateway.ExtendedGuild;
+using GuildSyncModel = Discord.API.Gateway.GuildSyncEvent;
 using MemberModel = Discord.API.GuildMember;
 using Model = Discord.API.Guild;
 using PresenceModel = Discord.API.Presence;
@@ -16,9 +19,10 @@ using VoiceStateModel = Discord.API.VoiceState;
 
 namespace Discord
 {
-    internal class CachedGuild : Guild, IUserGuild, ICachedEntity<ulong>
+    internal class CachedGuild : Guild, ICachedEntity<ulong>, IGuild, IUserGuild
     {
-        private TaskCompletionSource<bool> _downloaderPromise;
+        private readonly SemaphoreSlim _audioLock;
+        private TaskCompletionSource<bool> _syncPromise, _downloaderPromise;
         private ConcurrentHashSet<ulong> _channels;
         private ConcurrentDictionary<ulong, CachedGuildUser> _members;
         private ConcurrentDictionary<ulong, VoiceState> _voiceStates;
@@ -26,8 +30,11 @@ namespace Discord
         public bool Available { get; private set; }
         public int MemberCount { get; private set; }
         public int DownloadedMemberCount { get; private set; }
+        public AudioClient AudioClient { get; private set; }
 
         public bool HasAllMembers => _downloaderPromise.Task.IsCompleted;
+        public bool IsSynced => _syncPromise.Task.IsCompleted;
+        public Task SyncPromise => _syncPromise.Task;
         public Task DownloaderPromise => _downloaderPromise.Task;
 
         public new DiscordSocketClient Discord => base.Discord as DiscordSocketClient;
@@ -42,9 +49,12 @@ namespace Discord
             }
         }
         public IReadOnlyCollection<CachedGuildUser> Members => _members.ToReadOnlyCollection();
+        public IEnumerable<KeyValuePair<ulong, VoiceState>> VoiceStates => _voiceStates;
         
         public CachedGuild(DiscordSocketClient discord, ExtendedModel model, DataStore dataStore) : base(discord, model)
         {
+            _audioLock = new SemaphoreSlim(1, 1);
+            _syncPromise = new TaskCompletionSource<bool>();
             _downloaderPromise = new TaskCompletionSource<bool>();
             Update(model, UpdateSource.Creation, dataStore);
         }
@@ -85,16 +95,15 @@ namespace Discord
                 DownloadedMemberCount = 0;
                 for (int i = 0; i < model.Members.Length; i++)
                     AddUser(model.Members[i], dataStore, members);
-                _downloaderPromise = new TaskCompletionSource<bool>();
-                if (!model.Large)
-                    _downloaderPromise.SetResult(true);
+                if (Discord.ApiClient.AuthTokenType != TokenType.User)
+                {
+                    var _ = _syncPromise.TrySetResultAsync(true);
+                    if (!model.Large)
+                        _ = _downloaderPromise.TrySetResultAsync(true);
+                }
 
                 for (int i = 0; i < model.Presences.Length; i++)
-                {
-                    var presence = model.Presences[i];
-                    UpdatePresence(presence, dataStore, members);
-                    //AddUser(presence, dataStore, members);
-                }
+                    AddOrUpdateUser(model.Presences[i], dataStore, members);
             }
             _members = members;
             
@@ -104,6 +113,34 @@ namespace Discord
                     AddOrUpdateVoiceState(model.VoiceStates[i], dataStore, voiceStates);
             }
             _voiceStates = voiceStates;
+        }
+        public void Update(GuildSyncModel model, UpdateSource source, DataStore dataStore)
+        {
+            if (source == UpdateSource.Rest && IsAttached) return;
+
+            var members = new ConcurrentDictionary<ulong, CachedGuildUser>(1, (int)(model.Presences.Length * 1.05));
+            {
+                DownloadedMemberCount = 0;
+                for (int i = 0; i < model.Members.Length; i++)
+                    AddUser(model.Members[i], dataStore, members);
+                var _ = _syncPromise.TrySetResultAsync(true);
+                if (!model.Large)
+                    _ = _downloaderPromise.TrySetResultAsync(true);
+
+                for (int i = 0; i < model.Presences.Length; i++)
+                    AddOrUpdateUser(model.Presences[i], dataStore, members);
+            }
+            _members = members;
+        }
+
+        public void Update(EmojiUpdateModel model, UpdateSource source)
+        {
+            if (source == UpdateSource.Rest && IsAttached) return;
+            
+            var emojis = ImmutableArray.CreateBuilder<Emoji>(model.Emojis.Length);
+            for (int i = 0; i < model.Emojis.Length; i++)
+                emojis.Add(new Emoji(model.Emojis[i]));
+            Emojis = emojis.ToImmutableArray();
         }
 
         public override Task<IGuildChannel> GetChannelAsync(ulong id) => Task.FromResult<IGuildChannel>(GetChannel(id));
@@ -143,9 +180,6 @@ namespace Discord
             => Task.FromResult<IGuildUser>(CurrentUser);
         public override Task<IReadOnlyCollection<IGuildUser>> GetUsersAsync() 
             => Task.FromResult<IReadOnlyCollection<IGuildUser>>(Members);
-        //TODO: Is there a better way of exposing pagination?
-        public override Task<IReadOnlyCollection<IGuildUser>> GetUsersAsync(int limit, int offset) 
-            => Task.FromResult<IReadOnlyCollection<IGuildUser>>(Members.OrderBy(x => x.Id).Skip(offset).Take(limit).ToImmutableArray());
         public CachedGuildUser AddUser(MemberModel model, DataStore dataStore, ConcurrentDictionary<ulong, CachedGuildUser> members = null)
         {
             members = members ?? _members;
@@ -158,12 +192,11 @@ namespace Discord
                 var user = Discord.GetOrAddUser(model.User, dataStore);
                 member = new CachedGuildUser(this, user, model);
                 members[user.Id] = member;
-                user.AddRef();
                 DownloadedMemberCount++;
             }
             return member;
         }
-        public CachedGuildUser AddUser(PresenceModel model, DataStore dataStore, ConcurrentDictionary<ulong, CachedGuildUser> members = null)
+        public CachedGuildUser AddOrUpdateUser(PresenceModel model, DataStore dataStore, ConcurrentDictionary<ulong, CachedGuildUser> members = null)
         {
             members = members ?? _members;
 
@@ -194,37 +227,19 @@ namespace Discord
                 return member;
             return null;
         }
-        public void UpdatePresence(PresenceModel model, DataStore dataStore, ConcurrentDictionary<ulong, CachedGuildUser> members = null)
+        public override async Task DownloadUsersAsync()
         {
-            members = members ?? _members;
-
-            CachedGuildUser member;
-            if (members.TryGetValue(model.User.Id, out member))
-                member.Update(model, UpdateSource.WebSocket);
-            else
-            {
-                var user = Discord.GetOrAddUser(model.User, dataStore);
-                member = new CachedGuildUser(this, user, model);
-                members[user.Id] = member;
-                user.AddRef();
-                DownloadedMemberCount++;
-            }
-        }
-        public async Task DownloadMembersAsync()
-        {
-            if (!HasAllMembers)
-                await Discord.ApiClient.SendRequestMembersAsync(new ulong[] { Id }).ConfigureAwait(false);
-            await _downloaderPromise.Task.ConfigureAwait(false);
+            await Discord.DownloadUsersAsync(new [] { this });
         }
         public void CompleteDownloadMembers()
         {
-            _downloaderPromise.TrySetResult(true);
+            _downloaderPromise.TrySetResultAsync(true);
         }
 
         public VoiceState AddOrUpdateVoiceState(VoiceStateModel model, DataStore dataStore, ConcurrentDictionary<ulong, VoiceState> voiceStates = null)
         {
             var voiceChannel = dataStore.GetChannel(model.ChannelId.Value) as CachedVoiceChannel;
-            var voiceState = new VoiceState(voiceChannel, model.SessionId, model.SelfMute, model.SelfDeaf, model.Suppress);
+            var voiceState = new VoiceState(voiceChannel, model);
             (voiceStates ?? _voiceStates)[model.UserId] = voiceState;
             return voiceState;
         }
@@ -241,6 +256,55 @@ namespace Discord
             if (_voiceStates.TryRemove(id, out voiceState))
                 return voiceState;
             return null;
+        }
+
+        public async Task ConnectAudio(int id, string url, string token)
+        {
+            AudioClient audioClient;
+            await _audioLock.WaitAsync().ConfigureAwait(false);
+            var voiceState = GetVoiceState(CurrentUser.Id).Value;
+            try
+            {
+                audioClient = AudioClient;
+                if (audioClient == null)
+                {
+                    audioClient = new AudioClient(this, id);
+                    audioClient.Disconnected += async ex =>
+                    {
+                        await _audioLock.WaitAsync().ConfigureAwait(false);
+                        try
+                        {
+                            if (ex != null)
+                            {
+                                //Reconnect if we still have channel info.
+                                //TODO: Is this threadsafe? Could channel data be deleted before we access it?
+                                var voiceState2 = GetVoiceState(CurrentUser.Id);
+                                if (voiceState2.HasValue)
+                                {
+                                    var voiceChannelId = voiceState2.Value.VoiceChannel?.Id;
+                                    if (voiceChannelId != null)
+                                        await Discord.ApiClient.SendVoiceStateUpdateAsync(Id, voiceChannelId, voiceState2.Value.IsSelfDeafened, voiceState2.Value.IsSelfMuted);
+                                }
+                            }
+                            else
+                            {
+                                try { AudioClient.Dispose(); } catch { }
+                                AudioClient = null;
+                            }
+                        }
+                        finally
+                        {
+                            _audioLock.Release();
+                        }
+                    };
+                    AudioClient = audioClient;
+                }
+            }
+            finally
+            {
+                _audioLock.Release();
+            }
+            await audioClient.ConnectAsync(url, CurrentUser.Id, voiceState.VoiceSessionId, token).ConfigureAwait(false);
         }
 
         public CachedGuild Clone() => MemberwiseClone() as CachedGuild;
@@ -260,5 +324,6 @@ namespace Discord
 
         bool IUserGuild.IsOwner => OwnerId == Discord.CurrentUser.Id;
         GuildPermissions IUserGuild.Permissions => CurrentUser.GuildPermissions;
+        IAudioClient IGuild.AudioClient => AudioClient;
     }
 }

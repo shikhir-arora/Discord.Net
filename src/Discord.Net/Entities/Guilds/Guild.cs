@@ -1,4 +1,5 @@
 ﻿using Discord.API.Rest;
+using Discord.Audio;
 using Discord.Extensions;
 using System;
 using System.Collections.Concurrent;
@@ -22,13 +23,15 @@ namespace Discord
         public string Name { get; private set; }
         public int AFKTimeout { get; private set; }
         public bool IsEmbeddable { get; private set; }
-        public int VerificationLevel { get; private set; }
+        public VerificationLevel VerificationLevel { get; private set; }
+        public MfaLevel MfaLevel { get; private set; }
+        public DefaultMessageNotifications DefaultMessageNotifications { get; private set; }
 
+        public override DiscordClient Discord { get; }
         public ulong? AFKChannelId { get; private set; }
         public ulong? EmbedChannelId { get; private set; }
         public ulong OwnerId { get; private set; }
         public string VoiceRegionId { get; private set; }
-        public override DiscordClient Discord { get; }
         public ImmutableArray<Emoji> Emojis { get; protected set; }
         public ImmutableArray<string> Features { get; protected set; }
 
@@ -60,7 +63,9 @@ namespace Discord
             VoiceRegionId = model.Region;
             _splashId = model.Splash;
             VerificationLevel = model.VerificationLevel;
-            
+            MfaLevel = model.MfaLevel;
+            DefaultMessageNotifications = model.DefaultMessageNotifications;
+
             if (model.Emojis != null)
             {
                 var emojis = ImmutableArray.CreateBuilder<Emoji>(model.Emojis.Length);
@@ -116,6 +121,12 @@ namespace Discord
 
             var args = new ModifyGuildParams();
             func(args);
+
+            if (args.Splash.IsSpecified && _splashId != null)
+                args.SplashHash = _splashId;
+            if (args.Icon.IsSpecified && _iconId != null)
+                args.IconHash = _iconId;
+
             var model = await Discord.ApiClient.ModifyGuildAsync(Id, args).ConfigureAwait(false);
             Update(model, UpdateSource.Rest);
         }
@@ -268,12 +279,6 @@ namespace Discord
             var models = await Discord.ApiClient.GetGuildMembersAsync(Id, args).ConfigureAwait(false);
             return models.Select(x => new GuildUser(this, new User(x.User), x)).ToImmutableArray();
         }
-        public virtual async Task<IReadOnlyCollection<IGuildUser>> GetUsersAsync(int limit, int offset)
-        {
-            var args = new GetGuildMembersParams { Limit = limit, Offset = offset };
-            var models = await Discord.ApiClient.GetGuildMembersAsync(Id, args).ConfigureAwait(false);
-            return models.Select(x => new GuildUser(this, new User(x.User), x)).ToImmutableArray();
-        }
         public async Task<int> PruneUsersAsync(int days = 30, bool simulate = false)
         {
             var args = new GuildPruneParams() { Days = days };
@@ -283,6 +288,10 @@ namespace Discord
             else
                 model = await Discord.ApiClient.BeginGuildPruneAsync(Id, args).ConfigureAwait(false);
             return model.Pruned;
+        }
+        public virtual Task DownloadUsersAsync()
+        {
+            throw new NotSupportedException();
         }
 
         internal GuildChannel ToChannel(API.Channel model)
@@ -306,7 +315,7 @@ namespace Discord
         IRole IGuild.EveryoneRole => EveryoneRole;
         IReadOnlyCollection<Emoji> IGuild.Emojis => Emojis;
         IReadOnlyCollection<string> IGuild.Features => Features;
-        Task IGuild.DownloadUsersAsync() { throw new NotSupportedException(); }
+        IAudioClient IGuild.AudioClient => null;
 
         IRole IGuild.GetRole(ulong id) => GetRole(id);
     }

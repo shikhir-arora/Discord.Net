@@ -5,15 +5,13 @@ namespace Discord
 {
     internal class CachedGuildUser : GuildUser, ICachedUser
     {
-        private Game _game;
-        private UserStatus _status;
-
         public new DiscordSocketClient Discord => base.Discord as DiscordSocketClient;
         public new CachedGuild Guild => base.Guild as CachedGuild;
         public new CachedGlobalUser User => base.User as CachedGlobalUser;
+        public Presence Presence => User.Presence; //{ get; private set; }
 
-        public override Game Game => _game;
-        public override UserStatus Status => _status;
+        public override Game Game => Presence.Game;
+        public override UserStatus Status => Presence.Status;
 
         public VoiceState? VoiceState => Guild.GetVoiceState(Id);
         public bool IsSelfDeafened => VoiceState?.IsSelfDeafened ?? false;
@@ -24,6 +22,7 @@ namespace Discord
         public CachedGuildUser(CachedGuild guild, CachedGlobalUser user, Model model) 
             : base(guild, user, model)
         {
+            //Presence = new Presence(null, UserStatus.Offline);
         }
         public CachedGuildUser(CachedGuild guild, CachedGlobalUser user, PresenceModel model)
             : base(guild, user, model)
@@ -34,8 +33,10 @@ namespace Discord
         {
             base.Update(model, source);
 
-            _status = model.Status;
-            _game = model.Game != null ? new Game(model.Game) : (Game)null;
+            var game = model.Game != null ? new Game(model.Game) : null;
+            //Presence = new Presence(game, model.Status);
+
+            User.Update(model, source);
         }
 
         public CachedGuildUser Clone() => MemberwiseClone() as CachedGuildUser;

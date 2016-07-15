@@ -1,5 +1,6 @@
 ﻿using System;
 using Model = Discord.API.User;
+using PresenceModel = Discord.API.Presence;
 
 namespace Discord
 {
@@ -7,9 +8,9 @@ namespace Discord
     {
         private ushort _references;
 
+        public Presence Presence { get; private set; }
+
         public new DiscordSocketClient Discord { get { throw new NotSupportedException(); } }
-        public override UserStatus Status => UserStatus.Unknown;// _status;
-        public override Game Game => null; //_game;
 
         public CachedGlobalUser(Model model) 
             : base(model)
@@ -31,6 +32,22 @@ namespace Discord
                 if (--_references == 0)
                     discord.RemoveUser(Id);
             }
+        }
+
+        public override void Update(Model model, UpdateSource source)
+        {
+            lock (this)
+                base.Update(model, source);
+        }
+        public void Update(PresenceModel model, UpdateSource source)
+        {
+            //Race conditions are okay here. Multiple shards racing already cant guarantee presence in order.
+
+            //lock (this)
+            //{
+                var game = model.Game != null ? new Game(model.Game) : null;
+                Presence = new Presence(game, model.Status);
+            //}
         }
 
         public CachedGlobalUser Clone() => MemberwiseClone() as CachedGlobalUser;

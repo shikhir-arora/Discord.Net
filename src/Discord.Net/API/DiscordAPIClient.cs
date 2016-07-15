@@ -1,6 +1,5 @@
 ﻿using Discord.API.Gateway;
 using Discord.API.Rest;
-using Discord.Extensions;
 using Discord.Net;
 using Discord.Net.Converters;
 using Discord.Net.Queue;
@@ -24,10 +23,17 @@ namespace Discord.API
 {
     public class DiscordApiClient : IDisposable
     {
-        public event Func<string, string, double, Task> SentRequest;
-        public event Func<int, Task> SentGatewayMessage;
-        public event Func<GatewayOpCode, int?, string, object, Task> ReceivedGatewayEvent;
-        public event Func<Exception, Task> Disconnected;
+        private object _eventLock = new object();
+
+        public event Func<string, string, double, Task> SentRequest { add { _sentRequestEvent.Add(value); } remove { _sentRequestEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<string, string, double, Task>> _sentRequestEvent = new AsyncEvent<Func<string, string, double, Task>>();
+        public event Func<GatewayOpCode, Task> SentGatewayMessage { add { _sentGatewayMessageEvent.Add(value); } remove { _sentGatewayMessageEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<GatewayOpCode, Task>> _sentGatewayMessageEvent = new AsyncEvent<Func<GatewayOpCode, Task>>();
+
+        public event Func<GatewayOpCode, int?, string, object, Task> ReceivedGatewayEvent { add { _receivedGatewayEvent.Add(value); } remove { _receivedGatewayEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<GatewayOpCode, int?, string, object, Task>> _receivedGatewayEvent = new AsyncEvent<Func<GatewayOpCode, int?, string, object, Task>>();
+        public event Func<Exception, Task> Disconnected { add { _disconnectedEvent.Add(value); } remove { _disconnectedEvent.Remove(value); } }
+        private readonly AsyncEvent<Func<Exception, Task>> _disconnectedEvent = new AsyncEvent<Func<Exception, Task>>();
 
         private readonly RequestQueue _requestQueue;
         private readonly JsonSerializer _serializer;
@@ -67,25 +73,25 @@ namespace Discord.API
                         using (var reader = new StreamReader(decompressed))
                         {
                             var msg = JsonConvert.DeserializeObject<WebSocketMessage>(reader.ReadToEnd());
-                            await ReceivedGatewayEvent.RaiseAsync((GatewayOpCode)msg.Operation, msg.Sequence, msg.Type, msg.Payload).ConfigureAwait(false);
+                            await _receivedGatewayEvent.InvokeAsync((GatewayOpCode)msg.Operation, msg.Sequence, msg.Type, msg.Payload).ConfigureAwait(false);
                         }
                     }
                 };
                 _gatewayClient.TextMessage += async text =>
                 {
                     var msg = JsonConvert.DeserializeObject<WebSocketMessage>(text);
-                    await ReceivedGatewayEvent.RaiseAsync((GatewayOpCode)msg.Operation, msg.Sequence, msg.Type, msg.Payload).ConfigureAwait(false);
+                    await _receivedGatewayEvent.InvokeAsync((GatewayOpCode)msg.Operation, msg.Sequence, msg.Type, msg.Payload).ConfigureAwait(false);
                 };
                 _gatewayClient.Closed += async ex =>
                 {
                     await DisconnectAsync().ConfigureAwait(false);
-                    await Disconnected.RaiseAsync(ex).ConfigureAwait(false);
+                    await _disconnectedEvent.InvokeAsync(ex).ConfigureAwait(false);
                 };
             }
 
             _serializer = serializer ?? new JsonSerializer { ContractResolver = new DiscordContractResolver() };
         }
-        void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!_isDisposed)
             {
@@ -93,6 +99,8 @@ namespace Discord.API
                 {
                     _loginCancelToken?.Dispose();
                     _connectCancelToken?.Dispose();
+                    (_restClient as IDisposable)?.Dispose();
+                    (_gatewayClient as IDisposable)?.Dispose();
                 }
                 _isDisposed = true;
             }
@@ -311,7 +319,7 @@ namespace Discord.API
             stopwatch.Stop();
 
             double milliseconds = ToMilliseconds(stopwatch);
-            await SentRequest.RaiseAsync(method, endpoint, milliseconds).ConfigureAwait(false);
+            await _sentRequestEvent.InvokeAsync(method, endpoint, milliseconds).ConfigureAwait(false);
 
             return responseStream;
         }
@@ -324,7 +332,7 @@ namespace Discord.API
             stopwatch.Stop();
 
             double milliseconds = ToMilliseconds(stopwatch);
-            await SentRequest.RaiseAsync(method, endpoint, milliseconds).ConfigureAwait(false);
+            await _sentRequestEvent.InvokeAsync(method, endpoint, milliseconds).ConfigureAwait(false);
 
             return responseStream;
         }
@@ -344,7 +352,7 @@ namespace Discord.API
             if (payload != null)
                 bytes = Encoding.UTF8.GetBytes(SerializeJson(payload));
             await _requestQueue.SendAsync(new WebSocketRequest(_gatewayClient, bytes, true, options), group, bucketId, guildId).ConfigureAwait(false);
-            await SentGatewayMessage.RaiseAsync((int)opCode).ConfigureAwait(false);
+            await _sentGatewayMessageEvent.InvokeAsync(opCode).ConfigureAwait(false);
         }
 
         //Auth
@@ -386,9 +394,33 @@ namespace Discord.API
         {
             await SendGatewayAsync(GatewayOpCode.Heartbeat, lastSeq, options: options).ConfigureAwait(false);
         }
+        public async Task SendStatusUpdateAsync(long? idleSince, Game game, RequestOptions options = null)
+        {
+            var args = new StatusUpdateParams
+            {
+                IdleSince = idleSince,
+                Game = game
+            };
+            await SendGatewayAsync(GatewayOpCode.StatusUpdate, args, options: options).ConfigureAwait(false);
+        }
         public async Task SendRequestMembersAsync(IEnumerable<ulong> guildIds, RequestOptions options = null)
         {
             await SendGatewayAsync(GatewayOpCode.RequestGuildMembers, new RequestMembersParams { GuildIds = guildIds, Query = "", Limit = 0 }, options: options).ConfigureAwait(false);
+        }
+        public async Task SendVoiceStateUpdateAsync(ulong guildId, ulong? channelId, bool selfDeaf, bool selfMute, RequestOptions options = null)
+        {
+            var payload = new VoiceStateUpdateParams
+            {
+                GuildId = guildId,
+                ChannelId = channelId,
+                SelfDeaf = selfDeaf,
+                SelfMute = selfMute
+            };
+            await SendGatewayAsync(GatewayOpCode.VoiceStateUpdate, payload, options: options).ConfigureAwait(false);
+        }
+        public async Task SendGuildSyncAsync(IEnumerable<ulong> guildIds, RequestOptions options = null)
+        {
+            await SendGatewayAsync(GatewayOpCode.GuildSync, guildIds, options: options).ConfigureAwait(false);
         }
 
         //Channels
@@ -488,13 +520,35 @@ namespace Discord.API
         //Channel Permissions
         public async Task ModifyChannelPermissionsAsync(ulong channelId, ulong targetId, ModifyChannelPermissionsParams args, RequestOptions options = null)
         {
+            Preconditions.NotEqual(channelId, 0, nameof(channelId));
+            Preconditions.NotEqual(targetId, 0, nameof(targetId));
             Preconditions.NotNull(args, nameof(args));
 
             await SendAsync("PUT", $"channels/{channelId}/permissions/{targetId}", args, options: options).ConfigureAwait(false);
         }
         public async Task DeleteChannelPermissionAsync(ulong channelId, ulong targetId, RequestOptions options = null)
         {
+            Preconditions.NotEqual(channelId, 0, nameof(channelId));
+            Preconditions.NotEqual(targetId, 0, nameof(targetId));
+
             await SendAsync("DELETE", $"channels/{channelId}/permissions/{targetId}", options: options).ConfigureAwait(false);
+        }
+
+        //Channel Pins
+        public async Task AddPinAsync(ulong channelId, ulong messageId, RequestOptions options = null)
+        {
+            Preconditions.GreaterThan(channelId, 0, nameof(channelId));
+            Preconditions.GreaterThan(messageId, 0, nameof(messageId));
+
+            await SendAsync("PUT", $"channels/{channelId}/pins/{messageId}", options: options).ConfigureAwait(false);
+
+        }
+        public async Task RemovePinAsync(ulong channelId, ulong messageId, RequestOptions options = null)
+        {
+            Preconditions.NotEqual(channelId, 0, nameof(channelId));
+            Preconditions.NotEqual(messageId, 0, nameof(messageId));
+
+            await SendAsync("DELETE", $"channels/{channelId}/pins/{messageId}", options: options).ConfigureAwait(false);
         }
 
         //Guilds
@@ -537,7 +591,6 @@ namespace Discord.API
             Preconditions.NotNullOrEmpty(args.Name, nameof(args.Name));
             Preconditions.GreaterThan(args.OwnerId, 0, nameof(args.OwnerId));
             Preconditions.NotNull(args.Region, nameof(args.Region));
-            Preconditions.AtLeast(args.VerificationLevel, 0, nameof(args.VerificationLevel));
 
             return await SendAsync<Guild>("PATCH", $"guilds/{guildId}", args, options: options).ConfigureAwait(false);
         }
@@ -711,10 +764,10 @@ namespace Discord.API
             Preconditions.NotEqual(guildId, 0, nameof(guildId));
             Preconditions.NotNull(args, nameof(args));
             Preconditions.GreaterThan(args.Limit, 0, nameof(args.Limit));
-            Preconditions.AtLeast(args.Offset, 0, nameof(args.Offset));
+            Preconditions.GreaterThan(args.AfterUserId, 0, nameof(args.AfterUserId));
 
             int limit = args.Limit.GetValueOrDefault(int.MaxValue);
-            int offset = args.Offset.GetValueOrDefault(0);
+            ulong afterUserId = args.AfterUserId.GetValueOrDefault(0);
 
             List<GuildMember[]> result;
             if (args.Limit.IsSpecified)
@@ -725,7 +778,7 @@ namespace Discord.API
             while (true)
             {
                 int runLimit = (limit >= DiscordConfig.MaxUsersPerBatch) ? DiscordConfig.MaxUsersPerBatch : limit;
-                string endpoint = $"guilds/{guildId}/members?limit={runLimit}&offset={offset}";
+                string endpoint = $"guilds/{guildId}/members?limit={runLimit}&after={afterUserId}";
                 var models = await SendAsync<GuildMember[]>("GET", endpoint, options: options).ConfigureAwait(false);
 
                 //Was this an empty batch?
@@ -734,7 +787,7 @@ namespace Discord.API
                 result.Add(models);
 
                 limit -= DiscordConfig.MaxUsersPerBatch;
-                offset += models.Length;
+                afterUserId = models[models.Length - 1].User.Id;
 
                 //Was this an incomplete (the last) batch?
                 if (models.Length != DiscordConfig.MaxUsersPerBatch) break;
@@ -865,8 +918,32 @@ namespace Discord.API
                 //Was this an empty batch?
                 if (models.Length == 0) break;
 
-                result[i] = models;                
-                relativeId = args.RelativeDirection == Direction.Before ? models[0].Id : models[models.Length - 1].Id;
+                //We can't assume these messages to be sorted by id (fails in rare cases), lets search for the highest/lowest id ourselves
+                switch (args.RelativeDirection)
+                {
+                    case Direction.Before:
+                    case Direction.Around:
+                    default:
+                        result[i] = models;
+                        relativeId = ulong.MaxValue;
+                        //Lowest id *should* be the last one
+                        for (int j = models.Length - 1; j >= 0; j--)
+                        {
+                            if (models[j].Id < relativeId.Value)
+                                relativeId = models[j].Id;
+                        }
+                        break;
+                    case Direction.After:
+                        result[runs - i - 1] = models;
+                        relativeId = ulong.MinValue;
+                        //Highest id *should* be the first one
+                        for (int j = 0; j < models.Length; j++)
+                        {
+                            if (models[j].Id > relativeId.Value)
+                                relativeId = models[j].Id;
+                        }
+                        break;
+                }
 
                 //Was this an incomplete (the last) batch?
                 if (models.Length != DiscordConfig.MaxMessagesPerBatch) { i++; break; }
@@ -874,13 +951,28 @@ namespace Discord.API
 
             if (i > 1)
             {
-                if (args.RelativeDirection == Direction.Before)
-                    return result.Take(i).SelectMany(x => x).ToImmutableArray();
-                else
-                    return result.Take(i).Reverse().SelectMany(x => x).ToImmutableArray();
+                switch (args.RelativeDirection)
+                {
+                    case Direction.Before:
+                    case Direction.Around:
+                    default:
+                        return result.Take(i).SelectMany(x => x).ToImmutableArray();
+                    case Direction.After:
+                        return result.Skip(runs - i).Take(i).SelectMany(x => x).ToImmutableArray();
+                }
             }
             else if (i == 1)
-                return result[0];
+            {
+                switch (args.RelativeDirection)
+                {
+                    case Direction.Before:
+                    case Direction.Around:
+                    default:
+                        return result[0];
+                    case Direction.After:
+                        return result[runs - 1];
+                }
+            }
             else
                 return ImmutableArray.Create<Message>();
         }

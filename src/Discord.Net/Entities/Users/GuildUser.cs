@@ -15,9 +15,7 @@ namespace Discord
     internal class GuildUser : IGuildUser, ISnowflakeEntity
     {
         private long? _joinedAtTicks;
-
-        public bool IsDeaf { get; private set; }
-        public bool IsMute { get; private set; }
+        
         public string Nickname { get; private set; }
         public GuildPermissions GuildPermissions { get; private set; }
 
@@ -29,9 +27,11 @@ namespace Discord
         public string AvatarUrl => User.AvatarUrl;
         public DateTimeOffset CreatedAt => User.CreatedAt;
         public string Discriminator => User.Discriminator;
+        public ushort DiscriminatorValue => User.DiscriminatorValue;
         public bool IsAttached => User.IsAttached;
         public bool IsBot => User.IsBot;
         public string Mention => User.Mention;
+        public string NicknameMention => User.NicknameMention;
         public string Username => User.Username;
 
         public virtual UserStatus Status => UserStatus.Unknown;
@@ -59,11 +59,7 @@ namespace Discord
         public void Update(Model model, UpdateSource source)
         {
             if (source == UpdateSource.Rest && IsAttached) return;
-
-            //if (model.Deaf.IsSpecified)
-                IsDeaf = model.Deaf;
-            //if (model.Mute.IsSpecified)
-                IsMute = model.Mute;
+            
             //if (model.JoinedAt.IsSpecified)
                 _joinedAtTicks = model.JoinedAt.UtcTicks;
             if (model.Nick.IsSpecified)
@@ -80,13 +76,6 @@ namespace Discord
                 UpdateRoles(model.Roles.Value);
             if (model.Nick.IsSpecified)
                 Nickname = model.Nick.Value;
-        }
-        public void Update(VoiceStateModel model, UpdateSource source)
-        {
-            if (source == UpdateSource.Rest && IsAttached) return;
-
-            IsDeaf = model.Deaf;
-            IsMute = model.Mute;
         }
         private void UpdateRoles(ulong[] roleIds)
         {
@@ -127,10 +116,6 @@ namespace Discord
             if (!isCurrentUser || args.Deaf.IsSpecified || args.Mute.IsSpecified || args.RoleIds.IsSpecified)
             {
                 await Discord.ApiClient.ModifyGuildMemberAsync(Guild.Id, Id, args).ConfigureAwait(false);
-                if (args.Deaf.IsSpecified)
-                    IsDeaf = args.Deaf.Value;
-                if (args.Mute.IsSpecified)
-                    IsMute = args.Mute.Value;
                 if (args.Nickname.IsSpecified)
                     Nickname = args.Nickname.Value ?? "";
                 if (args.RoleIds.IsSpecified)
@@ -161,6 +146,8 @@ namespace Discord
 
         IGuild IGuildUser.Guild => Guild;
         IReadOnlyCollection<IRole> IGuildUser.Roles => Roles;
+        bool IVoiceState.IsDeafened => false;
+        bool IVoiceState.IsMuted => false;
         bool IVoiceState.IsSelfDeafened => false;
         bool IVoiceState.IsSelfMuted => false;
         bool IVoiceState.IsSuppressed => false;

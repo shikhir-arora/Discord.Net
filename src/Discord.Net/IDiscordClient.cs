@@ -1,4 +1,6 @@
 using Discord.API;
+using Discord.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -6,12 +8,14 @@ using System.Threading.Tasks;
 namespace Discord
 {
     //TODO: Add docstrings
-    public interface IDiscordClient
+    //TODO: Docstrings should explain when REST requests are sent and how many
+    public interface IDiscordClient : IDisposable
     {
         LoginState LoginState { get; }
         ConnectionState ConnectionState { get; }
 
         DiscordApiClient ApiClient { get; }
+        ILogManager LogManager { get; }
         
         Task LoginAsync(TokenType tokenType, string token, bool validateToken = true);
         Task LogoutAsync();
@@ -25,7 +29,8 @@ namespace Discord
         Task<IReadOnlyCollection<IConnection>> GetConnectionsAsync();
 
         Task<IGuild> GetGuildAsync(ulong id);
-        Task<IReadOnlyCollection<IUserGuild>> GetGuildsAsync();
+        Task<IReadOnlyCollection<IGuild>> GetGuildsAsync();
+        Task<IReadOnlyCollection<IUserGuild>> GetGuildSummariesAsync();
         Task<IGuild> CreateGuildAsync(string name, IVoiceRegion region, Stream jpegIcon = null);
         
         Task<IInvite> GetInviteAsync(string inviteIdOrXkcd);

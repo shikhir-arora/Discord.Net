@@ -20,6 +20,14 @@ namespace Discord
         /// <summary> Parses a provided user mention string. </summary>
         public static ulong ParseUser(string mentionText)
         {
+            ulong id;
+            if (TryParseUser(mentionText, out id))
+                return id;
+            throw new ArgumentException("Invalid mention format", nameof(mentionText));
+        }
+        /// <summary> Tries to parse a provided user mention string. </summary>
+        public static bool TryParseUser(string mentionText, out ulong userId)
+        {
             mentionText = mentionText.Trim();
             if (mentionText.Length >= 3 && mentionText[0] == '<' && mentionText[1] == '@' && mentionText[mentionText.Length - 1] == '>')
             {
@@ -27,134 +35,201 @@ namespace Discord
                     mentionText = mentionText.Substring(3, mentionText.Length - 4); //<@!123>
                 else
                     mentionText = mentionText.Substring(2, mentionText.Length - 3); //<@123>
-
-                ulong id;
-                if (ulong.TryParse(mentionText, NumberStyles.None, CultureInfo.InvariantCulture, out id))
-                    return id;
+                
+                if (ulong.TryParse(mentionText, NumberStyles.None, CultureInfo.InvariantCulture, out userId))
+                    return true;
             }
-            throw new ArgumentException("Invalid mention format", nameof(mentionText));
+            userId = 0;
+            return false;
         }
+
         /// <summary> Parses a provided channel mention string. </summary>
         public static ulong ParseChannel(string mentionText)
+        {
+            ulong id;
+            if (TryParseChannel(mentionText, out id))
+                return id;
+            throw new ArgumentException("Invalid mention format", nameof(mentionText));
+        }
+        /// <summary>Tries to parse a provided channel mention string. </summary>
+        public static bool TryParseChannel(string mentionText, out ulong channelId)
         {
             mentionText = mentionText.Trim();
             if (mentionText.Length >= 3 && mentionText[0] == '<' && mentionText[1] == '#' && mentionText[mentionText.Length - 1] == '>')
             {
                 mentionText = mentionText.Substring(2, mentionText.Length - 3); //<#123>
-
-                ulong id;
-                if (ulong.TryParse(mentionText, NumberStyles.None, CultureInfo.InvariantCulture, out id))
-                    return id;
+                
+                if (ulong.TryParse(mentionText, NumberStyles.None, CultureInfo.InvariantCulture, out channelId))
+                    return true;
             }
-            throw new ArgumentException("Invalid mention format", nameof(mentionText));
+            channelId = 0;
+            return false;
         }
+
         /// <summary> Parses a provided role mention string. </summary>
         public static ulong ParseRole(string mentionText)
+        {
+            ulong id;
+            if (TryParseRole(mentionText, out id))
+                return id;
+            throw new ArgumentException("Invalid mention format", nameof(mentionText));
+        }
+        /// <summary>Tries to parse a provided role mention string. </summary>
+        public static bool TryParseRole(string mentionText, out ulong roleId)
         {
             mentionText = mentionText.Trim();
             if (mentionText.Length >= 4 && mentionText[0] == '<' && mentionText[1] == '@' && mentionText[2] == '&' && mentionText[mentionText.Length - 1] == '>')
             {
                 mentionText = mentionText.Substring(3, mentionText.Length - 4); //<@&123>
-
-                ulong id;
-                if (ulong.TryParse(mentionText, NumberStyles.None, CultureInfo.InvariantCulture, out id))
-                    return id;
+                
+                if (ulong.TryParse(mentionText, NumberStyles.None, CultureInfo.InvariantCulture, out roleId))
+                    return true;
             }
-            throw new ArgumentException("Invalid mention format", nameof(mentionText));
+            roleId = 0;
+            return false;
         }
-
-        /// <summary> Gets the ids of all users mentioned in a provided text.</summary>
-        public static ImmutableArray<ulong> GetUserMentions(string text) => GetMentions(text, _userRegex).ToImmutable();
-        /// <summary> Gets the ids of all channels mentioned in a provided text.</summary>
-        public static ImmutableArray<ulong> GetChannelMentions(string text) => GetMentions(text, _channelRegex).ToImmutable();
-        /// <summary> Gets the ids of all roles mentioned in a provided text.</summary>
-        public static ImmutableArray<ulong> GetRoleMentions(string text) => GetMentions(text, _roleRegex).ToImmutable();
-        private static ImmutableArray<ulong>.Builder GetMentions(string text, Regex regex)
+        
+        internal static ImmutableArray<IUser> GetUserMentions(string text, IMessageChannel channel, IReadOnlyCollection<IUser> fallbackUsers)
         {
-            var matches = regex.Matches(text);
+            var matches = _userRegex.Matches(text);
+            var builder = ImmutableArray.CreateBuilder<IUser>(matches.Count);
+            foreach (var match in matches.OfType<Match>())
+            {
+                ulong id;
+                if (ulong.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
+                {
+                    IUser user = null;
+                    if (channel.IsAttached) //Waiting this sync is safe because it's using a cache
+                        user = channel.GetUserAsync(id).GetAwaiter().GetResult() as IUser;
+                    if (user == null)
+                    {
+                        foreach (var fallbackUser in fallbackUsers)
+                        {
+                            if (fallbackUser.Id == id)
+                            {
+                                user = fallbackUser;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (user != null)
+                        builder.Add(user);
+                }
+            }
+            return builder.ToImmutable();
+        }
+        internal static ImmutableArray<ulong> GetChannelMentions(string text, IGuild guild)
+        {
+            var matches = _channelRegex.Matches(text);
             var builder = ImmutableArray.CreateBuilder<ulong>(matches.Count);
             foreach (var match in matches.OfType<Match>())
             {
                 ulong id;
                 if (ulong.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
+                {
+                    /*var channel = guild.GetChannelAsync(id).GetAwaiter().GetResult();
+                    if (channel != null)
+                        builder.Add(channel);*/
                     builder.Add(id);
+                }
             }
-            return builder;
+            return builder.ToImmutable();
         }
-
-        internal static string CleanUserMentions(string text, ImmutableArray<User> mentions)
+        internal static ImmutableArray<IRole> GetRoleMentions(string text, IGuild guild)
+        {
+            var matches = _roleRegex.Matches(text);
+            var builder = ImmutableArray.CreateBuilder<IRole>(matches.Count);
+            foreach (var match in matches.OfType<Match>())
+            {
+                ulong id;
+                if (ulong.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
+                {
+                    var role = guild.GetRole(id);
+                    if (role != null)
+                        builder.Add(role);
+                }
+            }
+            return builder.ToImmutable();
+        }
+        
+        internal static string ResolveUserMentions(string text, IMessageChannel channel, IReadOnlyCollection<IUser> mentions, UserResolveMode mode)
         {
             return _userRegex.Replace(text, new MatchEvaluator(e =>
             {
                 ulong id;
                 if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
                 {
-                    for (int i = 0; i < mentions.Length; i++)
+                    IUser user = null;
+                    foreach (var mention in mentions)
                     {
-                        var mention = mentions[i];
                         if (mention.Id == id)
-                            return '@' + mention.Username;
+                        {
+                            user = mention;
+                            break;
+                        }
+                    }
+                    if (user != null)
+                    {
+                        string name = user.Username;
+
+                        var guildUser = user as IGuildUser;
+                        if (e.Value[2] == '!')
+                        {
+                            if (guildUser != null && guildUser.Nickname != null)
+                                name = guildUser.Nickname;
+                        }
+
+                        switch (mode)
+                        {
+                            case UserResolveMode.NameOnly:
+                            default:
+                                return $"@{name}";
+                            case UserResolveMode.NameAndDiscriminator:
+                                return $"@{name}#{user.Discriminator}";
+                        }
                     }
                 }
                 return e.Value;
             }));
         }
-        internal static string CleanUserMentions<T>(string text, IReadOnlyDictionary<ulong, T> users, ImmutableArray<T>.Builder mentions = null)
-            where T : IGuildUser
+        internal static string ResolveChannelMentions(string text, IGuild guild)
         {
-            return _channelRegex.Replace(text, new MatchEvaluator(e =>
+            if (guild.IsAttached) //It's too expensive to do a channel lookup in REST mode
             {
-                ulong id;
-                if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
+                return _channelRegex.Replace(text, new MatchEvaluator(e =>
                 {
-                    T user;
-                    if (users.TryGetValue(id, out user))
+                    ulong id;
+                    if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
                     {
-                        if (users != null)
-                            mentions.Add(user);
-                        if (e.Value[2] == '!' && user.Nickname != null)
-                            return '@' + user.Nickname;
-                        else
-                            return '@' + user.Username;
+                        IGuildChannel channel = null;
+                        channel = guild.GetChannelAsync(id).GetAwaiter().GetResult();
+                        if (channel != null)
+                            return '#' + channel.Name;
                     }
-                }
-                return e.Value;
-            }));
+                    return e.Value;
+                }));
+            }
+            return text;
         }
-        internal static string CleanChannelMentions<T>(string text, IReadOnlyDictionary<ulong, T> channels, ImmutableArray<T>.Builder mentions = null)
-            where T : IGuildChannel
+        internal static string ResolveRoleMentions(string text, IGuild guild, IReadOnlyCollection<IRole> mentions)
         {
-            return _channelRegex.Replace(text, new MatchEvaluator(e =>
+            return _roleRegex.Replace(text, new MatchEvaluator(e =>
             {
                 ulong id;
                 if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
                 {
-                    T channel;
-                    if (channels.TryGetValue(id, out channel))
+                    IRole role = null;
+                    foreach (var mention in mentions)
                     {
-                        if (channels != null)
-                            mentions.Add(channel);
-                        return '#' + channel.Name;
+                        if (mention.Id == id)
+                        {
+                            role = mention;
+                            break;
+                        }
                     }
-                }
-                return e.Value;
-            }));
-        }
-        internal static string CleanRoleMentions<T>(string text, IReadOnlyDictionary<ulong, T> roles, ImmutableArray<T>.Builder mentions = null)
-            where T : IRole
-        {
-            return _channelRegex.Replace(text, new MatchEvaluator(e =>
-            {
-                ulong id;
-                if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
-                {
-                    T role;
-                    if (roles.TryGetValue(id, out role))
-                    {
-                        if (mentions != null)
-                            mentions.Add(role);
+                    if (role != null)
                         return '@' + role.Name;
-                    }
                 }
                 return e.Value;
             }));

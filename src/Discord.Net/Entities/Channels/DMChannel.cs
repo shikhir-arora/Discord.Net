@@ -28,11 +28,9 @@ namespace Discord
         }
         public void Update(Model model, UpdateSource source)
         {
-            if (source == UpdateSource.Rest && IsAttached) return;
+            if (/*source == UpdateSource.Rest && */IsAttached) return;
             
-            //TODO: Is this cast okay?
-            if (Recipient is User)
-                (Recipient as User).Update(model.Recipient.Value, source);
+            (Recipient as User).Update(model.Recipient.Value, source);
         }
 
         public async Task UpdateAsync()
@@ -60,12 +58,7 @@ namespace Discord
         public virtual async Task<IReadOnlyCollection<IUser>> GetUsersAsync()
         {
             var currentUser = await Discord.GetCurrentUserAsync().ConfigureAwait(false);
-            return ImmutableArray.Create<IUser>(currentUser, Recipient);
-        }
-        public virtual async Task<IReadOnlyCollection<IUser>> GetUsersAsync(int limit, int offset)
-        {
-            var currentUser = await Discord.GetCurrentUserAsync().ConfigureAwait(false);
-            return new IUser[] { currentUser, Recipient }.Skip(offset).Take(limit).ToImmutableArray();
+            return ImmutableArray.Create(currentUser, Recipient);
         }
 
         public async Task<IMessage> SendMessageAsync(string text, bool isTTS)

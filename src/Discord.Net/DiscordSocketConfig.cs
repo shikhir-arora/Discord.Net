@@ -1,4 +1,4 @@
-﻿using Discord.Data;
+﻿using Discord.Audio;
 using Discord.Net.WebSockets;
 
 namespace Discord
@@ -24,18 +24,15 @@ namespace Discord
         /// This makes operations such as User.GetPermissions(Channel), User.GuildPermissions, Channel.GetUser, and Channel.Members much faster at the expense of increased memory usage.
         /// </summary>
         public bool UsePermissionsCache { get; set; } = false;*/
-        /// <summary> Gets or sets whether the a copy of a model is generated on an update event to allow you to check which properties changed. </summary>
-        public bool EnablePreUpdateEvents { get; set; } = true;
         /// <summary> 
         /// Gets or sets the max number of users a guild may have for offline users to be included in the READY packet. Max is 250. 
         /// Decreasing this may reduce CPU usage while increasing login time and network usage. 
         /// </summary>
         public int LargeThreshold { get; set; } = 250;
 
-        //Engines
+        /// <summary> Gets or sets the type of audio this DiscordClient supports. </summary>
+        public AudioMode AudioMode { get; set; } = AudioMode.Disabled;
 
-        /// <summary> Gets or sets the provider used to generate datastores. </summary>
-        public DataStoreProvider DataStoreProvider { get; set; } = (shardId, totalShards, guildCount, dmCount) => new DefaultDataStore(guildCount, dmCount);
         /// <summary> Gets or sets the provider used to generate new websocket connections. </summary>
         public WebSocketProvider WebSocketProvider { get; set; } = () => new DefaultWebSocketClient();
     }

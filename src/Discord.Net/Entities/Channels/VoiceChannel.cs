@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Model = Discord.API.Channel;
+using Discord.Audio;
 
 namespace Discord
 {
@@ -44,10 +45,8 @@ namespace Discord
         {
             throw new NotSupportedException();
         }
-        public override Task<IReadOnlyCollection<IGuildUser>> GetUsersAsync(int limit, int offset)
-        {
-            throw new NotSupportedException();
-        }
+
+        public virtual Task<IAudioClient> ConnectAsync() { throw new NotSupportedException(); }
 
         private string DebuggerDisplay => $"{Name} ({Id}, Voice)";
     }

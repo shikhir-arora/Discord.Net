@@ -11,9 +11,9 @@ namespace Discord
         DateTimeOffset? EditedTimestamp { get; }
         /// <summary> Returns true if this message was sent as a text-to-speech message. </summary>
         bool IsTTS { get; }
-        /// <summary> Returns the original, unprocessed text for this message. </summary>
-        string RawText { get; }
-        /// <summary> Returns the text for this message after mention processing. </summary>
+        /// <summary> Returns true if this message was added to its channel's pinned messages. </summary>
+        bool IsPinned { get; }
+        /// <summary> Returns the text for this message. </summary>
         string Text { get; }
         /// <summary> Gets the time this message was sent. </summary>
         DateTimeOffset Timestamp { get; }
@@ -23,17 +23,26 @@ namespace Discord
         /// <summary> Gets the author of this message. </summary>
         IUser Author { get; }
         /// <summary> Returns a collection of all attachments included in this message. </summary>
-        IReadOnlyCollection<Attachment> Attachments { get; }
+        IReadOnlyCollection<IAttachment> Attachments { get; }
         /// <summary> Returns a collection of all embeds included in this message. </summary>
         IReadOnlyCollection<IEmbed> Embeds { get; }
         /// <summary> Returns a collection of channel ids mentioned in this message. </summary>
         IReadOnlyCollection<ulong> MentionedChannelIds { get; }
-        /// <summary> Returns a collection of role ids mentioned in this message. </summary>
-        IReadOnlyCollection<ulong> MentionedRoleIds { get; }
-        /// <summary> Returns a collection of user ids mentioned in this message. </summary>
+        /// <summary> Returns a collection of roles mentioned in this message. </summary>
+        IReadOnlyCollection<IRole> MentionedRoles { get; }
+        /// <summary> Returns a collection of users mentioned in this message. </summary>
         IReadOnlyCollection<IUser> MentionedUsers { get; }
 
         /// <summary> Modifies this message. </summary>
         Task ModifyAsync(Action<ModifyMessageParams> func);
+        /// <summary> Adds this message to its channel's pinned messages. </summary>
+        Task PinAsync();
+        /// <summary> Removes this message from its channel's pinned messages. </summary>
+        Task UnpinAsync();
+
+        /// <summary> Transforms this message's text into a human readable form, resolving things like mentions to that object's name. </summary>
+        string Resolve(int startIndex, int length, UserResolveMode userMode = UserResolveMode.NameOnly);
+        /// <summary> Transforms this message's text into a human readable form, resolving things like mentions to that object's name. </summary>
+        string Resolve(UserResolveMode userMode = UserResolveMode.NameOnly);
     }
 }
