@@ -60,6 +60,8 @@ The client will sustain a connection to this channel until it is kicked, disconn
 The IAudioClient
 ----------------
 
+|updated-sec|
+
 The IAudioClient is used to connect/disconnect to/from a Voice Channel, and to send audio to that Voice Channel.
 
 .. function:: Func<Task> IAudioClient.Connected

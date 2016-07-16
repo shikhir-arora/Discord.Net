@@ -12,7 +12,7 @@ public class Program
 			LogLevel = LogSeverity.Info
         });
 
-        _client.Log += (message) => Console.WriteLine($"[{message.Severity}] {message.Source} -> {message.Message}");
+        _client.Log += (message) => Console.WriteLine($"{message.ToString()}");
 
         await _client.LoginAsync(TokenType.Bot, "bot token");
     }

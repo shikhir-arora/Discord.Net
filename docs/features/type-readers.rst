@@ -30,7 +30,12 @@ Next, satisfy the ``TypeReader`` class by adding an ``override Task<TypeReaderRe
 
 Inside this task, you may add whatever logic you need to parse the input string. 
 
-**todo:** finish writing this lol
+Finally, return a ``TypeReaderResult``. If you were able to succesfully parse the input, return ``TypeReaderResult.FromSuccess(parsed_input)``. Otherwise, return ``TypeReaderResult.FromError``.
+
+Installing Type Readers
+-----------------------
+
+TypeReaders are not automatically discovered by the Command Service. To install a Type Reader, invoke ``_commands.AddTypeReader(Type, TypeReader)`` (where _commands is your CommandService).
 
 Example
 -------
