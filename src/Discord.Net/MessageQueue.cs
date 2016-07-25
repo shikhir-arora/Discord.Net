@@ -126,6 +126,10 @@ namespace Discord.Net
                                 {
                                     msg.RawText = text;
                                     msg.Text = msg.Resolve(text);
+
+                                    if (!msg.Channel.IsPrivate && !msg.Channel.GetPermissions(msg.User).SendMessages)
+                                        continue;
+
                                     var request = new SendMessageRequest(msg.Channel.Id)
                                     {
                                         Content = msg.RawText,
