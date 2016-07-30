@@ -18,7 +18,7 @@ namespace Discord.API.Client.Rest
         public bool IsMuted { get; set; }
         [JsonProperty("deaf")]
         public bool IsDeafened { get; set; }
-        [JsonProperty("channel_id"), JsonConverter(typeof(NullableLongStringConverter))]
+        [JsonProperty("channel_id", NullValueHandling = NullValueHandling.Ignore), JsonConverter(typeof(NullableLongStringConverter))]
         public ulong? VoiceChannelId { get; set; }
         [JsonProperty("roles"), JsonConverter(typeof(LongStringArrayConverter))]
         public ulong[] RoleIds { get; set; }
