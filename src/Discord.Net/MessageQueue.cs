@@ -133,10 +133,24 @@ namespace Discord.Net
                                         Nonce = msg.Nonce.ToString(),
                                         IsTTS = msg.IsTTS
                                     };
-                                    var response = await _rest.Send(request).ConfigureAwait(false);
-                                    msg.State = MessageState.Normal;
-                                    msg.Id = response.Id;
-                                    msg.Update(response);
+#pragma warning disable
+                                    _rest.Send(request).ContinueWith((t, msgObj) =>
+                                    {
+                                        var localMsg = msgObj as Message;
+                                        if (t.Status == TaskStatus.RanToCompletion)
+                                        {
+                                            var x = t.Result;
+                                            localMsg.State = MessageState.Normal;
+                                            localMsg.Id = x.Id;
+                                            localMsg.Update(x);
+                                        }
+                                        else
+                                        {
+                                            localMsg.State = MessageState.Failed;
+                                            _logger.Error($"Failed to send message to {localMsg.Channel.Path}", t.Exception);
+                                        }
+                                    }, msg);
+#pragma warning restore
                                 }
                                 catch (Exception ex)
                                 {
