@@ -14,10 +14,15 @@ namespace Discord
         private static readonly Regex _channelRegex = new Regex(@"<#([0-9]+)>", RegexOptions.Compiled);
         private static readonly Regex _roleRegex = new Regex(@"<@&([0-9]+)>", RegexOptions.Compiled);
 
-        //Unsure the system can be positive a user doesn't have a nickname, assume useNickname = true (source: Jake)
+        //If the system can't be positive a user doesn't have a nickname, assume useNickname = true (source: Jake)
         internal static string Mention(IUser user, bool useNickname = true) => useNickname ? $"<@!{user.Id}>" : $"<@{user.Id}>";
+        public static string MentionUser(ulong id) => $"<@!{id}>";
+
         internal static string Mention(IChannel channel) => $"<#{channel.Id}>";
-        internal static string Mention(IRole role) => $"<&{role.Id}>";
+        public static string MentionChannel(ulong id) => $"<#{id}>";
+
+        internal static string Mention(IRole role) => $"<@&{role.Id}>";
+        public static string MentionRole(ulong id) => $"<@&{id}>";
 
         /// <summary> Parses a provided user mention string. </summary>
         public static ulong ParseUser(string mentionText)
@@ -203,30 +208,30 @@ namespace Discord
         {
             if (mode == ChannelMentionHandling.Ignore) return text;
 
-            if (guild.IsAttached) //It's too expensive to do a channel lookup in REST mode
+            return _channelRegex.Replace(text, new MatchEvaluator(e =>
             {
-                return _channelRegex.Replace(text, new MatchEvaluator(e =>
+                ulong id;
+                if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
                 {
-                    ulong id;
-                    if (ulong.TryParse(e.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out id))
+                    switch (mode)
                     {
-                        switch (mode)
-                        {
-                            case ChannelMentionHandling.Remove:
-                                return "";
-                            case ChannelMentionHandling.Name:
+                        case ChannelMentionHandling.Remove:
+                            return "";
+                        case ChannelMentionHandling.Name:
+                            if (guild != null && guild.IsAttached) //It's too expensive to do a channel lookup in REST mode
+                            {
                                 IGuildChannel channel = null;
-                                channel = guild?.GetChannel(id);
+                                channel = guild.GetChannel(id);
                                 if (channel != null)
                                     return $"#{channel.Name}";
                                 else
                                     return $"#deleted-channel";
-                        }
+                            }
+                            break;
                     }
-                    return e.Value;
-                }));
-            }
-            return text;
+                }
+                return e.Value;
+            }));
         }
         internal static string ResolveRoleMentions(string text, IReadOnlyCollection<IRole> mentions, RoleMentionHandling mode)
         {

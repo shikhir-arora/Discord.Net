@@ -84,9 +84,7 @@ namespace Discord.WebSocket
             }
 
             base.Update(model as Model, source);
-
-            MemberCount = model.MemberCount;
-            
+                        
             var channels = new ConcurrentHashSet<ulong>(1, (int)(model.Channels.Length * 1.05));
             {
                 for (int i = 0; i < model.Channels.Length; i++)
@@ -110,7 +108,8 @@ namespace Discord.WebSocket
                     AddOrUpdateUser(model.Presences[i], dataStore, members);
             }
             _members = members;
-            
+            MemberCount = model.MemberCount;
+
             var voiceStates = new ConcurrentDictionary<ulong, VoiceState>(1, (int)(model.VoiceStates.Length * 1.05));
             {
                 for (int i = 0; i < model.VoiceStates.Length; i++)
@@ -186,6 +185,7 @@ namespace Discord.WebSocket
             => Task.FromResult<IReadOnlyCollection<IGuildUser>>(Members);
         public SocketGuildUser AddUser(MemberModel model, DataStore dataStore, ConcurrentDictionary<ulong, SocketGuildUser> members = null)
         {
+            MemberCount++;
             members = members ?? _members;
 
             SocketGuildUser member;
@@ -225,9 +225,13 @@ namespace Discord.WebSocket
         }
         public SocketGuildUser RemoveUser(ulong id)
         {
+            MemberCount--;
             SocketGuildUser member;
             if (_members.TryRemove(id, out member))
+            {
+                DownloadedMemberCount--;
                 return member;
+            }
             return null;
         }
         public override async Task DownloadUsersAsync()
