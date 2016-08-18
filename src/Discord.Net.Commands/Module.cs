@@ -11,6 +11,7 @@ namespace Discord.Commands
         public TypeInfo Source { get; }
         public CommandService Service { get; }
         public string Name { get; }
+        public string Prefix { get; }
         public string Summary { get; }
         public string Description { get; }
         public IEnumerable<Command> Commands { get; }
@@ -23,7 +24,12 @@ namespace Discord.Commands
             Source = source;
             Service = service;
             Name = source.Name;
+            Prefix = moduleAttr.Prefix ?? "";
             Instance = instance;
+
+            var nameAttr = source.GetCustomAttribute<NameAttribute>();
+            if (nameAttr != null)
+                Name = nameAttr.Text;
 
             var summaryAttr = source.GetCustomAttribute<SummaryAttribute>();
             if (summaryAttr != null)
@@ -34,7 +40,7 @@ namespace Discord.Commands
                 Description = descriptionAttr.Text;
 
             List<Command> commands = new List<Command>();
-            SearchClass(source, instance, commands, moduleAttr.Prefix ?? "", moduleAttr.AppendSpace);
+            SearchClass(source, instance, commands, Prefix, moduleAttr.AppendSpace);
             Commands = commands;
 
             Preconditions = BuildPreconditions();

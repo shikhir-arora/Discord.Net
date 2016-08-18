@@ -1,14 +1,13 @@
-﻿using System;
+using System;
 
 namespace Discord.Commands
 {
-    // Full summary of method
+    // Override public name of command/module
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
-    public class DescriptionAttribute : Attribute
+    public class NameAttribute : Attribute
     {
         public string Text { get; }
-
-        public DescriptionAttribute(string text)
+        public NameAttribute(string text)
         {
             Text = text;
         }
