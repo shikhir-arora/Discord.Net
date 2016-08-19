@@ -6,7 +6,7 @@
         CreateInstantInvite = 0,
         //KickMembers = 1,
         //BanMembers = 2,
-        //ManagePermissions = 3,
+        //Administrator = 3,
         ManageChannel = 4,
         //ManageGuild = 5,
 
@@ -19,6 +19,7 @@
         AttachFiles = 15,
         ReadMessageHistory = 16,
         MentionEveryone = 17,
+        UseExternalEmojis = 18,
 
         //Voice
         Connect = 20,
