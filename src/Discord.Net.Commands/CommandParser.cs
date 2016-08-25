@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Reflection;
+﻿using System.Collections.Immutable;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,9 +12,6 @@ namespace Discord.Commands
             Parameter,
             QuotedParameter
         }
-
-        private static readonly MethodInfo _convertArrayMethod = typeof(CommandParser).GetTypeInfo().GetDeclaredMethod(nameof(ConvertParamsList));
-        private static readonly ConcurrentDictionary<Type, Func<List<object>, object>> _arrayConverters = new ConcurrentDictionary<Type, Func<List<object>, object>>();
         
         public static async Task<ParseResult> ParseArgs(Command command, IMessage context, string input, int startPos)
         {
@@ -27,8 +20,8 @@ namespace Discord.Commands
             int endPos = input.Length;
             var curPart = ParserPart.None;
             int lastArgEndPos = int.MinValue;
-            var argList = ImmutableArray.CreateBuilder<object>();
-            List<object> paramsList = null; // TODO: could we use a better type?
+            var argList = ImmutableArray.CreateBuilder<TypeReaderResult>();
+            var paramList = ImmutableArray.CreateBuilder<TypeReaderResult>();
             bool isEscaping = false;
             char c;
 
@@ -116,31 +109,22 @@ namespace Discord.Commands
                         return ParseResult.FromError(CommandError.BadArgCount, "The input text has too many parameters.");
 
                     var typeReaderResult = await curParam.Parse(context, argString).ConfigureAwait(false);
-                    if (!typeReaderResult.IsSuccess)
+                    if (!typeReaderResult.IsSuccess && typeReaderResult.Error != CommandError.MultipleMatches)
                         return ParseResult.FromError(typeReaderResult);
 
                     if (curParam.IsMultiple)
                     {
-                        if (paramsList == null)
-                            paramsList = new List<object>();
-                        paramsList.Add(typeReaderResult.Value);
+                        paramList.Add(typeReaderResult);
 
                         if (curPos == endPos)
                         {
-                            var func = _arrayConverters.GetOrAdd(curParam.ElementType, t =>
-                            {
-                                var method = _convertArrayMethod.MakeGenericMethod(t);
-                                return (Func<List<object>, object>)method.CreateDelegate(typeof(Func<List<object>, object>));
-                            });
-                            argList.Add(func.Invoke(paramsList));
-
                             curParam = null;
                             curPart = ParserPart.None;
                         }
                     }
                     else
                     {
-                        argList.Add(typeReaderResult.Value);
+                        argList.Add(typeReaderResult);
 
                         curParam = null;
                         curPart = ParserPart.None;
@@ -154,34 +138,24 @@ namespace Discord.Commands
                 var typeReaderResult = await curParam.Parse(context, argBuilder.ToString()).ConfigureAwait(false);
                 if (!typeReaderResult.IsSuccess)
                     return ParseResult.FromError(typeReaderResult);
-                argList.Add(typeReaderResult.Value);
+                argList.Add(typeReaderResult);
             }
 
             if (isEscaping)
                 return ParseResult.FromError(CommandError.ParseFailed, "Input text may not end on an incomplete escape.");
             if (curPart == ParserPart.QuotedParameter)
                 return ParseResult.FromError(CommandError.ParseFailed, "A quoted parameter is incomplete");
-
-            if (argList.Count < command.Parameters.Count)
+            
+            //Add missing optionals
+            for (int i = argList.Count; i < command.Parameters.Count; i++)
             {
-                for (int i = argList.Count; i < command.Parameters.Count; i++)
-                {
-                    var param = command.Parameters[i];
-                    if (!param.IsOptional)
-                        return ParseResult.FromError(CommandError.BadArgCount, "The input text has too few parameters.");
-                    argList.Add(param.DefaultValue);
-                }
+                var param = command.Parameters[i];
+                if (!param.IsOptional)
+                    return ParseResult.FromError(CommandError.BadArgCount, "The input text has too few parameters.");
+                argList.Add(TypeReaderResult.FromSuccess(param.DefaultValue));
             }
-
-            return ParseResult.FromSuccess(argList.ToImmutable());
-        }
-
-        private static T[] ConvertParamsList<T>(List<object> paramsList)
-        {
-            var array = new T[paramsList.Count];
-            for (int i = 0; i < array.Length; i++)
-                array[i] = (T)paramsList[i];
-            return array;
+            
+            return ParseResult.FromSuccess(argList.ToImmutable(), paramList.ToImmutable());
         }
     }
 }
