@@ -51,6 +51,7 @@ namespace Discord.WebSocket
         internal int LargeThreshold { get; private set; }
         internal AudioMode AudioMode { get; private set; }
         internal DataStore DataStore { get; private set; }
+        internal int ConnectionTimeout { get; private set; }
         internal WebSocketProvider WebSocketProvider { get; private set; }
 
         public new API.DiscordSocketApiClient ApiClient => base.ApiClient as API.DiscordSocketApiClient;
@@ -70,6 +71,7 @@ namespace Discord.WebSocket
             LargeThreshold = config.LargeThreshold;
             AudioMode = config.AudioMode;
             WebSocketProvider = config.WebSocketProvider;
+            ConnectionTimeout = config.ConnectionTimeout;
 
             DataStore = new DataStore(0, 0);
             _nextAudioId = 1;
@@ -158,8 +160,17 @@ namespace Discord.WebSocket
             
             try
             {
-                _connectTask = new TaskCompletionSource<bool>();
+                var connectTask = new TaskCompletionSource<bool>();
+                _connectTask = connectTask;
                 _cancelToken = new CancellationTokenSource();
+
+                //Abort connection on timeout
+                Task.Run(async () =>
+                {
+                    await Task.Delay(ConnectionTimeout);
+                    connectTask.TrySetException(new TimeoutException());
+                });
+
                 await ApiClient.ConnectAsync().ConfigureAwait(false);
                 await _connectedEvent.InvokeAsync().ConfigureAwait(false);
 
@@ -249,6 +260,15 @@ namespace Discord.WebSocket
 
         private async Task StartReconnectAsync(Exception ex)
         {
+            if (ex == null)
+            {
+                if (_connectTask?.TrySetCanceled() ?? false) return;
+            }
+            else
+            {
+                if (_connectTask?.TrySetException(ex) ?? false) return;
+            }
+
             await _connectionLock.WaitAsync().ConfigureAwait(false);
             try
             {
@@ -260,15 +280,6 @@ namespace Discord.WebSocket
         }
         private async Task ReconnectInternalAsync(Exception ex, CancellationToken cancelToken)
         {
-            if (ex == null)
-            {
-                if (_connectTask?.TrySetCanceled() ?? false) return;
-            }
-            else
-            {
-                if (_connectTask?.TrySetException(ex) ?? false) return;
-            }
-
             try
             {
                 Random jitter = new Random();
@@ -348,10 +359,13 @@ namespace Discord.WebSocket
         internal SocketGuild RemoveGuild(ulong id)
         {
             var guild = DataStore.RemoveGuild(id);
-            foreach (var channel in guild.Channels)
-                guild.RemoveChannel(channel.Id);
-            foreach (var user in guild.Members)
-                guild.RemoveUser(user.Id);
+            if (guild != null)
+            {
+                foreach (var channel in guild.Channels)
+                    guild.RemoveChannel(channel.Id);
+                foreach (var user in guild.Members)
+                    guild.RemoveUser(user.Id);
+            }
             return guild;
         }
         
@@ -390,8 +404,11 @@ namespace Discord.WebSocket
         internal ISocketChannel RemovePrivateChannel(ulong id)
         {
             var channel = DataStore.RemoveChannel(id) as ISocketPrivateChannel;
-            foreach (var recipient in channel.Recipients)
-                recipient.User.RemoveRef(this);
+            if (channel != null)
+            {
+                foreach (var recipient in channel.Recipients)
+                    recipient.User.RemoveRef(this);
+            }
             return channel;
         }
 
@@ -619,35 +636,41 @@ namespace Discord.WebSocket
                                     {
                                         type = "GUILD_AVAILABLE";
                                         _lastGuildAvailableTime = Environment.TickCount;
-                                    }
-                                    await _gatewayLogger.DebugAsync($"Received Dispatch ({type})").ConfigureAwait(false);
+                                        await _gatewayLogger.DebugAsync($"Received Dispatch (GUILD_AVAILABLE)").ConfigureAwait(false);
 
-                                    SocketGuild guild;
-                                    if (data.Unavailable != false)
-                                    {
-                                        guild = AddGuild(data, DataStore);
-                                        if (ApiClient.AuthTokenType == TokenType.User)
-                                            await SyncGuildsAsync().ConfigureAwait(false);
-                                        await _joinedGuildEvent.InvokeAsync(guild).ConfigureAwait(false);
+                                        var guild = DataStore.GetGuild(data.Id);
+                                        if (guild != null)
+                                        {
+                                            guild.Update(data, UpdateSource.WebSocket, DataStore);
+
+                                            var unavailableGuilds = _unavailableGuilds;
+                                            if (unavailableGuilds != 0)
+                                                _unavailableGuilds = unavailableGuilds - 1;
+                                            await _guildAvailableEvent.InvokeAsync(guild).ConfigureAwait(false);
+                                        }
+                                        else
+                                        {
+                                            await _gatewayLogger.WarningAsync($"GUILD_AVAILABLE referenced an unknown guild.").ConfigureAwait(false);
+                                            return;
+                                        }
                                     }
                                     else
                                     {
-                                        guild = DataStore.GetGuild(data.Id);
+                                        await _gatewayLogger.DebugAsync($"Received Dispatch (GUILD_CREATE)").ConfigureAwait(false);
+
+                                        var guild = AddGuild(data, DataStore);
                                         if (guild != null)
-                                            guild.Update(data, UpdateSource.WebSocket, DataStore);
+                                        {
+                                            if (ApiClient.AuthTokenType == TokenType.User)
+                                                await SyncGuildsAsync().ConfigureAwait(false);
+                                            await _joinedGuildEvent.InvokeAsync(guild).ConfigureAwait(false);
+                                        }
                                         else
                                         {
-                                            await _gatewayLogger.WarningAsync($"{type} referenced an unknown guild.").ConfigureAwait(false);
+                                            await _gatewayLogger.WarningAsync($"GUILD_CREATE referenced an unknown guild.").ConfigureAwait(false);
                                             return;
                                         }
-
-                                        var unavailableGuilds = _unavailableGuilds;
-                                        if (unavailableGuilds != 0)
-                                            _unavailableGuilds = unavailableGuilds - 1;
                                     }
-
-                                    if (data.Unavailable != true)
-                                        await _guildAvailableEvent.InvokeAsync(guild).ConfigureAwait(false);
                                 }
                                 break;
                             case "GUILD_UPDATE":
@@ -719,25 +742,41 @@ namespace Discord.WebSocket
                                 {
                                     var data = (payload as JToken).ToObject<ExtendedGuild>(_serializer);
                                     if (data.Unavailable == true)
-                                        type = "GUILD_UNAVAILABLE";
-                                    await _gatewayLogger.DebugAsync($"Received Dispatch ({type})").ConfigureAwait(false);
-
-                                    var guild = RemoveGuild(data.Id);
-                                    if (guild != null)
                                     {
-                                        foreach (var member in guild.Members)
-                                            member.User.RemoveRef(this);
+                                        type = "GUILD_UNAVAILABLE";
+                                        await _gatewayLogger.DebugAsync($"Received Dispatch (GUILD_UNAVAILABLE)").ConfigureAwait(false);
 
-                                        await _guildUnavailableEvent.InvokeAsync(guild).ConfigureAwait(false);
-                                        if (data.Unavailable != true)
-                                            await _leftGuildEvent.InvokeAsync(guild).ConfigureAwait(false);
-                                        else
+                                        var guild = DataStore.GetGuild(data.Id);
+                                        if (guild != null)
+                                        {
+                                            foreach (var member in guild.Members)
+                                                member.User.RemoveRef(this);
+                                            await _guildUnavailableEvent.InvokeAsync(guild).ConfigureAwait(false);
                                             _unavailableGuilds++;
+                                        }
+                                        else
+                                        {
+                                            await _gatewayLogger.WarningAsync($"GUILD_UNAVAILABLE referenced an unknown guild.").ConfigureAwait(false);
+                                            return;
+                                        }
                                     }
                                     else
                                     {
-                                        await _gatewayLogger.WarningAsync($"{type} referenced an unknown guild.").ConfigureAwait(false);
-                                        return;
+                                        await _gatewayLogger.DebugAsync($"Received Dispatch (GUILD_DELETE)").ConfigureAwait(false);
+
+                                        var guild = RemoveGuild(data.Id);
+                                        if (guild != null)
+                                        {
+                                            foreach (var member in guild.Members)
+                                                member.User.RemoveRef(this);
+                                            await _guildUnavailableEvent.InvokeAsync(guild).ConfigureAwait(false);
+                                            await _leftGuildEvent.InvokeAsync(guild).ConfigureAwait(false);
+                                        }
+                                        else
+                                        {
+                                            await _gatewayLogger.WarningAsync($"GUILD_DELETE referenced an unknown guild.").ConfigureAwait(false);
+                                            return;
+                                        }
                                     }
                                 }
                                 break;
