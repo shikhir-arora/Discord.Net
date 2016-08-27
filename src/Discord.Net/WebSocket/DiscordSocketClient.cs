@@ -165,7 +165,7 @@ namespace Discord.WebSocket
                 _cancelToken = new CancellationTokenSource();
 
                 //Abort connection on timeout
-                Task.Run(async () =>
+                var _ = Task.Run(async () =>
                 {
                     await Task.Delay(ConnectionTimeout);
                     connectTask.TrySetException(new TimeoutException());
@@ -1566,11 +1566,11 @@ namespace Discord.WebSocket
                             return;
                         }
                     }
+                    _heartbeatTime = Environment.TickCount;
 
                     try
                     {
                         await ApiClient.SendHeartbeatAsync(_lastSeq).ConfigureAwait(false);
-                        _heartbeatTime = Environment.TickCount;
                     }
                     catch (Exception ex)
                     {
