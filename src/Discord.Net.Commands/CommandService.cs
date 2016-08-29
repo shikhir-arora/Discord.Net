@@ -188,13 +188,13 @@ namespace Discord.Commands
                 return SearchResult.FromError(CommandError.UnknownCommand, "Unknown command.");
         }
 
-        public Task<IResult> Execute(IUserMessage message, int argPos, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception) 
+        public Task<Tuple<Command, IResult>>  Execute(IUserMessage message, int argPos, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception) 
             => Execute(message, message.Content.Substring(argPos), multiMatchHandling);
-        public async Task<IResult> Execute(IUserMessage message, string input, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception)
+        public async Task<Tuple<Command,IResult>> Execute(IUserMessage message, string input, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception)
         {
             var searchResult = Search(message, input);
             if (!searchResult.IsSuccess)
-                return searchResult;
+                return new Tuple<Command, IResult>(null, searchResult);
 
             var commands = searchResult.Commands;
             for (int i = commands.Count - 1; i >= 0; i--)
@@ -203,7 +203,7 @@ namespace Discord.Commands
                 if (!preconditionResult.IsSuccess)
                 {
                     if (commands.Count == 1)
-                        return preconditionResult;
+                        return new Tuple<Command, IResult>(null, searchResult);
                     else
                         continue;
                 }
@@ -227,16 +227,16 @@ namespace Discord.Commands
                     if (!parseResult.IsSuccess)
                     {
                         if (commands.Count == 1)
-                            return parseResult;
+                            return new Tuple<Command, IResult>(null, parseResult);
                         else
                             continue;
                     }
                 }
 
-                return await commands[i].Execute(message, parseResult);
+                return new Tuple<Command, IResult>(commands[i], await commands[i].Execute(message, parseResult));
             }
-            
-            return SearchResult.FromError(CommandError.UnknownCommand, "This input does not match any overload.");
+
+            return new Tuple<Command, IResult>(null, SearchResult.FromError(CommandError.UnknownCommand, "This input does not match any overload."));
         }
     }
 }
