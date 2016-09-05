@@ -42,9 +42,6 @@ namespace Discord.Commands
                 if (attribute.Text == null)
                     Text = groupPrefix;
 
-                if (groupPrefix != "")
-                    groupPrefix += " ";
-
                 if (attribute.Text != null)
                     Text = groupPrefix + attribute.Text;
 

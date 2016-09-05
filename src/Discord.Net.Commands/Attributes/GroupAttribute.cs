@@ -9,7 +9,7 @@ namespace Discord.Commands
 
         public GroupAttribute()
         {
-            Prefix = null;
+            Prefix = "";
         }
         public GroupAttribute(string prefix)
         {
