@@ -1,4 +1,4 @@
-﻿{
+{
   "version": "1.0.0-beta-*",
   "description": "A Discord.Net extension adding command support.",
   "authors": [ "RogueException" ],
@@ -20,6 +20,13 @@
   },
 
   "configurations": {
+    "GlobalNadeko": {
+      "buildOptions": {
+        "define": [ "RELEASE" ],
+        "nowarn": [ "CS1573", "CS1591" ],
+        "optimize": true
+      }
+    },
     "Release": {
       "buildOptions": {
         "define": [ "RELEASE" ],
