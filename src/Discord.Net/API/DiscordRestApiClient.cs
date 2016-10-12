@@ -458,7 +458,7 @@ namespace Discord.API
             Preconditions.NotNull(args, nameof(args));
             Preconditions.AtLeast(args._deleteMessageDays, 0, nameof(args.DeleteMessageDays));
 
-            await SendAsync("PUT", $"guilds/{guildId}/bans/{userId}", args, options: options).ConfigureAwait(false);
+            await SendAsync("PUT", $"guilds/{guildId}/bans/{userId}?delete-message-days={args._deleteMessageDays}", null, options: options).ConfigureAwait(false);
         }
         public async Task RemoveGuildBanAsync(ulong guildId, ulong userId, RequestOptions options = null)
         {
