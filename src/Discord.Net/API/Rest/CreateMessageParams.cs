@@ -24,13 +24,7 @@ namespace Discord.API.Rest
 
         public CreateMessageParams(string content)
         {
-            if (string.IsNullOrEmpty(content))
-            {
-                Content = null;
-            } else
-            {
-                Content = content;
-            }
+          Content = content;
         }
     }
 }

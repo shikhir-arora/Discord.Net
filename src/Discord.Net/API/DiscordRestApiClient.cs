@@ -41,7 +41,7 @@ namespace Discord.API
         public DiscordRestApiClient(RestClientProvider restClientProvider, JsonSerializer serializer = null, RequestQueue requestQueue = null)
         {
             _restClientProvider = restClientProvider;
-            _serializer = serializer ?? new JsonSerializer { ContractResolver = new DiscordContractResolver() };
+            _serializer = serializer ?? new JsonSerializer { DateFormatString = "yyyy-MM-ddTHH:mm:ssZ", ContractResolver = new DiscordContractResolver() };
             RequestQueue = requestQueue;
 
             _stateLock = new SemaphoreSlim(1, 1);
@@ -915,7 +915,7 @@ namespace Discord.API
                     break;
             }
         }
-        public Task<Message> ModifyMessageAsync(ulong guildId, ulong channelId, ulong messageId, ModifyMessageParams args, RequestOptions options = null)
+        public Task<Message> ModifyMessageAsync(ulong guildId, ulong channelId, ulong messageId, Rest.ModifyMessageParams args, RequestOptions options = null)
         {
             Preconditions.NotEqual(guildId, 0, nameof(guildId));
 

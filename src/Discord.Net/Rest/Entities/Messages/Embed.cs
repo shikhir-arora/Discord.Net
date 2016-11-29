@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Linq;
+using System;
 using Model = Discord.API.Embed;
 
 namespace Discord.Rest
@@ -11,6 +12,9 @@ namespace Discord.Rest
         public string Title { get; }
         public string Type { get; }
         public uint? Color { get; }
+        public DateTimeOffset? Timestamp { get; }
+        public EmbedImage? Image { get; }
+        public EmbedVideo? Video { get; }
         public EmbedAuthor? Author { get; }
         public EmbedFooter? Footer { get; }
         public EmbedProvider? Provider { get; }
@@ -24,7 +28,7 @@ namespace Discord.Rest
             Title = model.Title;
             Description = model.Description;
             Color = model.Color;
-
+            Timestamp = model.Timestamp.Value;
 
             if (model.Provider.IsSpecified)
                 Provider = new EmbedProvider(model.Provider.Value);
@@ -32,10 +36,16 @@ namespace Discord.Rest
                 Thumbnail = new EmbedThumbnail(model.Thumbnail.Value);
             if (model.Author.IsSpecified)
                 Author = new EmbedAuthor(model.Author.Value);
+            if (model.Image.IsSpecified)
+                Image = EmbedImage.Create(model.Image.Value);
+            if (model.Video.IsSpecified)
+                Video = EmbedVideo.Create(model.Video.Value);
             if (model.Footer.IsSpecified)
                 Footer = new EmbedFooter(model.Footer.Value);
             if (model.Fields.IsSpecified)
                 Fields = model.Fields.Value.Select(x => EmbedField.Create(x)).ToImmutableArray();
+            else
+                Fields = ImmutableArray.Create<EmbedField>();
         }
     }
 }
