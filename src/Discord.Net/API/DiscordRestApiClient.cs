@@ -41,7 +41,7 @@ namespace Discord.API
         public DiscordRestApiClient(RestClientProvider restClientProvider, JsonSerializer serializer = null, RequestQueue requestQueue = null)
         {
             _restClientProvider = restClientProvider;
-            _serializer = serializer ?? new JsonSerializer { ContractResolver = new DiscordContractResolver() };
+            _serializer = serializer ?? new JsonSerializer { DateFormatString = "yyyy-MM-ddTHH:mm:ssZ", ContractResolver = new DiscordContractResolver() };
             RequestQueue = requestQueue;
 
             _stateLock = new SemaphoreSlim(1, 1);
