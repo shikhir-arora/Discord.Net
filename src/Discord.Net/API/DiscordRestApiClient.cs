@@ -915,7 +915,7 @@ namespace Discord.API
                     break;
             }
         }
-        public Task<Message> ModifyMessageAsync(ulong guildId, ulong channelId, ulong messageId, ModifyMessageParams args, RequestOptions options = null)
+        public Task<Message> ModifyMessageAsync(ulong guildId, ulong channelId, ulong messageId, Rest.ModifyMessageParams args, RequestOptions options = null)
         {
             Preconditions.NotEqual(guildId, 0, nameof(guildId));
 

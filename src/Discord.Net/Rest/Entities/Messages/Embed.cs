@@ -11,6 +11,8 @@ namespace Discord.Rest
         public string Title { get; }
         public string Type { get; }
         public uint? Color { get; }
+        public EmbedImage? Image { get; }
+        public EmbedVideo? Video { get; }
         public EmbedAuthor? Author { get; }
         public EmbedFooter? Footer { get; }
         public EmbedProvider? Provider { get; }
@@ -32,6 +34,10 @@ namespace Discord.Rest
                 Thumbnail = new EmbedThumbnail(model.Thumbnail.Value);
             if (model.Author.IsSpecified)
                 Author = new EmbedAuthor(model.Author.Value);
+            if (model.Image.IsSpecified)
+                Image = EmbedImage.Create(model.Image.Value);
+            if (model.Video.IsSpecified)
+                Video = EmbedVideo.Create(model.Video.Value);
             if (model.Footer.IsSpecified)
                 Footer = new EmbedFooter(model.Footer.Value);
             if (model.Fields.IsSpecified)

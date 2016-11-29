@@ -10,7 +10,7 @@ namespace Discord
         IReadOnlyCollection<IMessage> CachedMessages { get; }
 
         /// <summary> Sends a message to this message channel. </summary>
-        Task<IUserMessage> SendMessageAsync(string text, bool isTTS = false, API.Embed embed = null);
+        Task<IUserMessage> SendMessageAsync(string text, bool isTTS = false, EmbedBuilder embed = null);
         /// <summary> Sends a file to this text channel, with an optional caption. </summary>
         Task<IUserMessage> SendFileAsync(string filePath, string text = null, bool isTTS = false);
         /// <summary> Sends a file to this text channel, with an optional caption. </summary>

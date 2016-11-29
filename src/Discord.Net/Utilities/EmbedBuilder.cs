@@ -4,130 +4,247 @@ using Embed = Discord.API.Embed;
 using Field = Discord.API.EmbedField;
 using Author = Discord.API.EmbedAuthor;
 using Footer = Discord.API.EmbedFooter;
+using Thumbnail = Discord.API.EmbedThumbnail;
+using Image = Discord.API.EmbedImage;
 
 namespace Discord
 {
     public class EmbedBuilder
     {
-        public Embed embed = new Embed();
-        List<Field> fields = new List<Field>();
+        private readonly Embed _model;
+        private readonly List<Field> _fields;
 
         public EmbedBuilder()
         {
-            embed.Type = "rich";
+            _model = new Embed { Type = "rich" };
+            _fields = new List<Field>();
         }
 
-        public EmbedBuilder Title(string title)
+        public string Title { get { return _model.Title; } set { _model.Title = value; } }
+        public string Description { get { return _model.Description; } set { _model.Description = value; } }
+        public string Url { get { return _model.Url; } set { _model.Url = value; } }
+        public uint Color { get { return _model.Color; } set { _model.Color = value; } }
+        public EmbedAuthorBuilder Author { get; set; }
+        public EmbedFooterBuilder Footer { get; set; }
+        public EmbedThumbnailBuilder Thumbnail { get; set; }
+        public EmbedImageBuilder Image { get; set; }
+
+        public EmbedBuilder WithTitle(string title)
         {
-            embed.Title = title;
+            Title = title;
             return this;
         }
-        public EmbedBuilder Description(string description)
+        public EmbedBuilder WithDescription(string description)
         {
-            embed.Description = description;
+            Description = description;
             return this;
         }
-        public EmbedBuilder Url(string url)
+        public EmbedBuilder WithUrl(string url)
         {
-            embed.Url = url;
+            Url = url;
             return this;
         }
-        public EmbedBuilder Color(uint color)
+        public EmbedBuilder WithColor(uint color)
         {
-            embed.Color = color;
+            Color = color;
             return this;
         }
-        public EmbedBuilder Field(Func<EmbedFieldBuilder, EmbedFieldBuilder> builder)
+
+        public EmbedBuilder WithAuthor(EmbedAuthorBuilder author)
         {
-            fields.Add(builder(new EmbedFieldBuilder()).Build());
+            Author = author;
             return this;
         }
-        public EmbedBuilder Author(Func<EmbedAuthorBuilder, EmbedAuthorBuilder> builder)
+        public EmbedBuilder WithAuthor(Action<EmbedAuthorBuilder> action)
         {
-            embed.Author = builder(new EmbedAuthorBuilder()).Build();
+            var author = new EmbedAuthorBuilder();
+            action(author);
+            Author = author;
             return this;
         }
-        public EmbedBuilder Footer(Func<EmbedFooterBuilder, EmbedFooterBuilder> builder)
+        public EmbedBuilder WithFooter(EmbedFooterBuilder footer)
         {
-            embed.Footer = builder(new EmbedFooterBuilder()).Build();
+            Footer = footer;
             return this;
         }
-        public Embed Build()
+        public EmbedBuilder WithFooter(Action<EmbedFooterBuilder> action)
         {
-            embed.Fields = fields.ToArray();
-            return embed;
+            var footer = new EmbedFooterBuilder();
+            action(footer);
+            Footer = footer;
+            return this;
+        }
+        public EmbedBuilder WithThumbnail(EmbedThumbnailBuilder thumbnail)
+        {
+            Thumbnail = thumbnail;
+            return this;
+        }
+        public EmbedBuilder WithThumbnail(Action<EmbedThumbnailBuilder> action)
+        {
+            var thumbnail = new EmbedThumbnailBuilder();
+            action(thumbnail);
+            Thumbnail = thumbnail;
+            return this;
+        }
+        public EmbedBuilder WithImage(EmbedImageBuilder image)
+        {
+            Image = image;
+            return this;
+        }
+        public EmbedBuilder WithImage(Action<EmbedImageBuilder> action)
+        {
+            var image = new EmbedImageBuilder();
+            action(image);
+            Image = image;
+            return this;
+        }
+
+        public EmbedBuilder AddField(Action<EmbedFieldBuilder> action)
+        {
+            var field = new EmbedFieldBuilder();
+            action(field);
+            _fields.Add(field.ToModel());
+            return this;
+        }
+
+        internal Embed Build()
+        {
+            _model.Author = Author?.ToModel();
+            _model.Footer = Footer?.ToModel();
+            _model.Thumbnail = Thumbnail?.ToModel();
+            _model.Image = Image?.ToModel();
+            _model.Fields = _fields.ToArray();
+            return _model;
         }
     }
 
     public class EmbedFieldBuilder
     {
-        private Field embedField = new Field();
+        private Field _model;
 
-        public EmbedFieldBuilder Name(string name)
+        public string Name { get { return _model.Name; } set { _model.Name = value; } }
+        public string Value { get { return _model.Value; } set { _model.Value = value; } }
+        public bool IsInline { get { return _model.Inline; } set { _model.Inline = value; } }
+
+        public EmbedFieldBuilder()
         {
-            embedField.Name = name;
+            _model = new Field();
+        }
+
+        public EmbedFieldBuilder WithName(string name)
+        {
+            Name = name;
             return this;
         }
-        public EmbedFieldBuilder Value(string value)
+        public EmbedFieldBuilder WithValue(string value)
         {
-            embedField.Value = value;
+            Value = value;
             return this;
         }
-        public EmbedFieldBuilder Inline(bool inline)
+        public EmbedFieldBuilder WithIsInline(bool isInline)
         {
-            embedField.Inline = inline;
+            IsInline = isInline;
             return this;
         }
-        public Field Build()
-        {
-            return embedField;
-        }
+
+        internal Field ToModel() => _model;
     }
 
     public class EmbedAuthorBuilder
     {
-        private Author author = new Author();
+        private Author _model;
 
-        public EmbedAuthorBuilder Name(string name)
+        public string Name { get { return _model.Name; } set { _model.Name = value; } }
+        public string Url { get { return _model.Url; } set { _model.Url = value; } }
+        public string IconUrl { get { return _model.IconUrl; } set { _model.IconUrl = value; } }
+
+        public EmbedAuthorBuilder()
         {
-            author.Name = name;
+            _model = new Author();
+        }
+
+        public EmbedAuthorBuilder WithName(string name)
+        {
+            Name = name;
             return this;
         }
-        public EmbedAuthorBuilder Url(string url)
+        public EmbedAuthorBuilder WithUrl(string url)
         {
-            author.Url = url;
+            Url = url;
             return this;
         }
-        public EmbedAuthorBuilder IconUrl(string iconUrl)
+        public EmbedAuthorBuilder WithIconUrl(string iconUrl)
         {
-            author.IconUrl = iconUrl;
+            IconUrl = iconUrl;
             return this;
         }
-        public Author Build()
-        {
-            return author;
-        }
+
+        internal Author ToModel() => _model;
     }
 
     public class EmbedFooterBuilder
     {
-        private Footer footer = new Footer();
+        private Footer _model;
 
-        public EmbedFooterBuilder Text(string text)
+        public string Text { get { return _model.Text; } set { _model.Text = value; } }
+        public string IconUrl { get { return _model.IconUrl; } set { _model.IconUrl = value; } }
+
+        public EmbedFooterBuilder()
         {
-            footer.Text = text;
+            _model = new Footer();
+        }
+
+        public EmbedFooterBuilder WithText(string text)
+        {
+            Text = text;
             return this;
         }
-        public EmbedFooterBuilder IconUrl(string iconUrl)
+        public EmbedFooterBuilder WithIconUrl(string iconUrl)
         {
-            footer.IconUrl = iconUrl;
+            IconUrl = iconUrl;
             return this;
         }
-        public Footer Build()
-        {
-            return footer;
-        }
+
+        internal Footer ToModel() => _model;
     }
 
+    public class EmbedThumbnailBuilder
+    {
+        private Thumbnail _model;
 
+        public string Url { get { return _model.Url; } set { _model.Url = value; } }
+
+        public EmbedThumbnailBuilder()
+        {
+            _model = new Thumbnail();
+        }
+
+        public EmbedThumbnailBuilder WithUrl(string url)
+        {
+            Url = url;
+            return this;
+        }
+
+        internal Thumbnail ToModel() => _model;
+    }
+
+    public class EmbedImageBuilder
+    {
+        private Image _model;
+
+        public string Url { get { return _model.Url; } set { _model.Url = value; } }
+
+        public EmbedImageBuilder()
+        {
+            _model = new Image();
+        }
+
+        public EmbedImageBuilder WithUrl(string url)
+        {
+            Url = url;
+            return this;
+        }
+
+        internal Image ToModel() => _model;
+    }
 }
