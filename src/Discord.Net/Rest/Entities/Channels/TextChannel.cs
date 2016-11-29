@@ -60,9 +60,12 @@ namespace Discord.Rest
 
         public async Task<IUserMessage> SendMessageAsync(string text, bool isTTS, EmbedBuilder embed = null)
         {
-            var args = new CreateMessageParams(text) { Content = text, IsTTS = isTTS, Embed = embed.Build() };
-            var model = await Discord.ApiClient.CreateMessageAsync(Guild.Id, Id, args).ConfigureAwait(false);
-            return CreateOutgoingMessage(model);
+            try
+            {
+                var args = new CreateMessageParams(text) { Content = text, IsTTS = isTTS, Embed = embed.Build() };
+                var model = await Discord.ApiClient.CreateMessageAsync(Guild.Id, Id, args).ConfigureAwait(false);
+                return CreateOutgoingMessage(model);
+            } catch { return null; }
         }
         public async Task<IUserMessage> SendFileAsync(string filePath, string text, bool isTTS)
         {

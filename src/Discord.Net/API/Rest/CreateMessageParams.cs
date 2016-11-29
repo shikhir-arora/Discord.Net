@@ -7,8 +7,8 @@ namespace Discord.API.Rest
     public class CreateMessageParams
     {
         [JsonProperty("content")]
-        internal Optional<string> _content { get; set; }
-        public Optional<string> Content { set { _content = value; } }
+        internal string _content { get; set; }
+        public string Content { set { _content = value; } }
 
         [JsonProperty("nonce")]
         internal Optional<string> _nonce { get; set; }
