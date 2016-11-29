@@ -27,8 +27,8 @@ namespace Discord.Rest
             Type = model.Type;
             Title = model.Title;
             Description = model.Description;
-            Color = model.Color;
             Timestamp = model.Timestamp.Value;
+            Color = model.Color;
 
             if (model.Provider.IsSpecified)
                 Provider = new EmbedProvider(model.Provider.Value);

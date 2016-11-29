@@ -15,7 +15,7 @@ namespace Discord.API
         [JsonProperty("url")]
         public string Url { get; set; }
         [JsonProperty("color")]
-        public uint Color { get; set; }
+        public uint? Color { get; set; }
         [JsonProperty("timestamp")]
         public DateTimeOffset? Timestamp { get; set; }
         [JsonProperty("author")]

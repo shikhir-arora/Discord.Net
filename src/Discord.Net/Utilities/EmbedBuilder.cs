@@ -25,7 +25,7 @@ namespace Discord
         public string Url { get { return _model.Url; } set { _model.Url = value; } }
         public string ThumbnailUrl { get; set; }
         public string ImageUrl { get; set; }
-        public uint Color { get { return _model.Color; } set { _model.Color = value; } }
+        public uint? Color { get { return _model.Color; } set { _model.Color = value; } }
         public DateTimeOffset? Timestamp { get; set; }
         public EmbedAuthorBuilder Author { get; set; }
         public EmbedFooterBuilder Footer { get; set; }
