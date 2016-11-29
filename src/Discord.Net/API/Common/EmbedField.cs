@@ -5,6 +5,8 @@ namespace Discord.API
 {
     public class EmbedField
     {
+        [JsonProperty("index")]
+        public int Index { get; set; }
         [JsonProperty("name")]
         public string Name { get; set; }
         [JsonProperty("value")]
