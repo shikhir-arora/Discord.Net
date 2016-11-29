@@ -7,8 +7,8 @@ namespace Discord.API.Rest
     public class CreateMessageParams
     {
         [JsonProperty("content")]
-        internal string _content { get; set; }
-        public string Content { set { _content = value; } }
+        internal Optional<string> _content { get; set; }
+        public Optional<string> Content { set { _content = value; } }
 
         [JsonProperty("nonce")]
         internal Optional<string> _nonce { get; set; }
@@ -17,5 +17,20 @@ namespace Discord.API.Rest
         [JsonProperty("tts")]
         internal Optional<bool> _tts { get; set; }
         public bool IsTTS { set { _tts = value; } }
+
+        [JsonProperty("embed")]
+        internal Optional<Embed> _embed { get; set; }
+        public Embed Embed { set { _embed = value; } }
+
+        public CreateMessageParams(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                Content = null;
+            } else
+            {
+                Content = content;
+            }
+        }
     }
 }
