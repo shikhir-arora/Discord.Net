@@ -23,8 +23,8 @@ namespace Discord
         public string Title { get { return _model.Title; } set { _model.Title = value; } }
         public string Description { get { return _model.Description; } set { _model.Description = value; } }
         public string Url { get { return _model.Url; } set { _model.Url = value; } }
-        public string ThumbnailUrl { get; set; }
-        public string ImageUrl { get; set; }
+        public EmbedThumbnailBuilder Thumbnail { get; set; }
+        public EmbedImageBuilder Image { get; set; }
         public uint? Color { get { return _model.Color; } set { _model.Color = value; } }
         public DateTimeOffset? Timestamp { get; set; }
         public EmbedAuthorBuilder Author { get; set; }
@@ -35,14 +35,28 @@ namespace Discord
             Title = title;
             return this;
         }
-        public EmbedBuilder WithThumbnailUrl(string thumbnailUrl)
+        public EmbedBuilder WithThumbnail(EmbedThumbnailBuilder thumbnail)
         {
-            ThumbnailUrl = thumbnailUrl;
+            Thumbnail = thumbnail;
             return this;
         }
-        public EmbedBuilder WithImageUrl(string imageUrl)
+        public EmbedBuilder WithThumbnail(Action<EmbedThumbnailBuilder> action)
         {
-            ImageUrl = ImageUrl;
+            var thumbnail = new EmbedThumbnailBuilder();
+            action(thumbnail);
+            Thumbnail = thumbnail;
+            return this;
+        }
+        public EmbedBuilder WithImage(EmbedImageBuilder image)
+        {
+            Image = image;
+            return this;
+        }
+        public EmbedBuilder WithImage(Action<EmbedImageBuilder> action)
+        {
+            var image = new EmbedImageBuilder();
+            action(image);
+            Image = image;
             return this;
         }
         public EmbedBuilder WithDescription(string description)
@@ -111,17 +125,82 @@ namespace Discord
             _model.Author = Author?.ToModel();
             _model.Footer = Footer?.ToModel();
             _model.Timestamp = Timestamp?.ToUniversalTime();
-            _model.Thumbnail = ThumbnailUrl != null ? new Thumbnail { Url = ThumbnailUrl } : null;
-            _model.Image = ImageUrl != null ? new Image { Url = ImageUrl } : null;
+            _model.Thumbnail = Thumbnail?.ToModel();
+            _model.Image = Image?.ToModel();
             _model.Fields = _fields.ToArray();
             return _model;
         }
+    }
+
+    public class EmbedThumbnailBuilder
+    {
+        private Thumbnail _model;
+
+        public string Url { get { return _model.Url; } set { _model.Url = value; } }
+        public Optional<int> Height { get { return _model.Height; } set { _model.Height = value; } }
+        public Optional<int> Width { get { return _model.Width; } set { _model.Width = value; } }
+
+        public EmbedThumbnailBuilder()
+        {
+            _model = new Thumbnail();
+        }
+
+        public EmbedThumbnailBuilder WithUrl(string url)
+        {
+            Url = url;
+            return this;
+        }
+        public EmbedThumbnailBuilder WithHeight(int height)
+        {
+            Height = height;
+            return this;
+        }
+        public EmbedThumbnailBuilder WithWidth(int width)
+        {
+            Width = width;
+            return this;
+        }
+
+        internal Thumbnail ToModel() => _model;
+    }
+
+    public class EmbedImageBuilder
+    {
+        private Image _model;
+
+        public string Url { get { return _model.Url; } set { _model.Url = value; } }
+        public Optional<int> Height { get { return _model.Height; } set { _model.Height = value; } }
+        public Optional<int> Width { get { return _model.Width; } set { _model.Width = value; } }
+
+        public EmbedImageBuilder()
+        {
+            _model = new Image();
+        }
+
+        public EmbedImageBuilder WithUrl(string url)
+        {
+            Url = url;
+            return this;
+        }
+        public EmbedImageBuilder WithHeight(int height)
+        {
+            Height = height;
+            return this;
+        }
+        public EmbedImageBuilder WithWidth(int width)
+        {
+            Width = width;
+            return this;
+        }
+
+        internal Image ToModel() => _model;
     }
 
     public class EmbedFieldBuilder
     {
         private readonly Field _model;
 
+        public int Index { get { return _model.Index; } set { _model.Index = value; } }
         public string Name { get { return _model.Name; } set { _model.Name = value; } }
         public string Value { get { return _model.Value; } set { _model.Value = value; } }
         public bool IsInline { get { return _model.Inline; } set { _model.Inline = value; } }
@@ -129,6 +208,12 @@ namespace Discord
         public EmbedFieldBuilder()
         {
             _model = new Field();
+        }
+
+        public EmbedFieldBuilder WithIndex(int index)
+        {
+            Index = index;
+            return this;
         }
 
         public EmbedFieldBuilder WithName(string name)
