@@ -106,7 +106,7 @@ namespace Discord
             return this;
         }
 
-        internal Embed Build()
+        public Embed Build()
         {
             _model.Author = Author?.ToModel();
             _model.Footer = Footer?.ToModel();

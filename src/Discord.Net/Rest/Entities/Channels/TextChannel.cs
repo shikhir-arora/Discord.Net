@@ -58,15 +58,16 @@ namespace Discord.Rest
             return users.Where(x => Permissions.GetValue(Permissions.ResolveChannel(x, this, x.GuildPermissions.RawValue), ChannelPermission.ReadMessages)).ToImmutableArray();
         }
 
-        public async Task<IUserMessage> SendMessageAsync(string text, bool isTTS, EmbedBuilder embed = null)
+        public async Task<IUserMessage> SendMessageAsync(string text, bool isTTS, Discord.API.Embed embed = null)
         {
             try
             {
-                var args = new CreateMessageParams(text) { Content = text, IsTTS = isTTS, Embed = embed.Build() };
+                var args = new CreateMessageParams(text) { Content = text, IsTTS = isTTS, Embed = embed };
                 var model = await Discord.ApiClient.CreateMessageAsync(Guild.Id, Id, args).ConfigureAwait(false);
                 return CreateOutgoingMessage(model);
             } catch { return null; }
         }
+
         public async Task<IUserMessage> SendFileAsync(string filePath, string text, bool isTTS)
         {
             string filename = Path.GetFileName(filePath);

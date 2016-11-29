@@ -63,9 +63,9 @@ namespace Discord.Rest
             return ImmutableArray.Create(currentUser, Recipient);
         }
 
-        public async Task<IUserMessage> SendMessageAsync(string text, bool isTTS, EmbedBuilder embed = null)
+        public async Task<IUserMessage> SendMessageAsync(string text, bool isTTS, Discord.API.Embed embed = null)
         {
-            var args = new CreateMessageParams(text) { Content = text, IsTTS = isTTS, Embed = embed.Build() };
+            var args = new CreateMessageParams(text) { Content = text, IsTTS = isTTS, Embed = embed };
             var model = await Discord.ApiClient.CreateDMMessageAsync(Id, args).ConfigureAwait(false);
             return CreateOutgoingMessage(model);
         }
