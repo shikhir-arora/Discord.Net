@@ -27,9 +27,11 @@ namespace Discord.Rest
             Type = model.Type;
             Title = model.Title;
             Description = model.Description;
+            Color = model.Color.Value;
             Timestamp = model.Timestamp.Value;
-            Color = model.Color;
 
+            if (model.Provider.IsSpecified)
+                Provider = new EmbedProvider(model.Provider.Value);
             if (model.Provider.IsSpecified)
                 Provider = new EmbedProvider(model.Provider.Value);
             if (model.Thumbnail.IsSpecified)
@@ -43,7 +45,7 @@ namespace Discord.Rest
             if (model.Footer.IsSpecified)
                 Footer = new EmbedFooter(model.Footer.Value);
             if (model.Fields.IsSpecified)
-                Fields = model.Fields.Value.Select(x => EmbedField.Create(x)).ToImmutableArray();
+                Fields = model.Fields.Value.Select(EmbedField.Create).ToImmutableArray();
             else
                 Fields = ImmutableArray.Create<EmbedField>();
         }
