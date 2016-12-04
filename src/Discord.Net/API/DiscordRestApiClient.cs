@@ -909,9 +909,9 @@ namespace Discord.API
                     break;
                 default:
                     if (guildId != 0)
-                        await SendAsync("POST", $"channels/{channelId}/messages/bulk_delete", args, GuildBucket.DeleteMessages, guildId, options: options).ConfigureAwait(false);
+                        await SendAsync("POST", $"channels/{channelId}/messages/bulk-delete", args, GuildBucket.DeleteMessages, guildId, options: options).ConfigureAwait(false);
                     else
-                        await SendAsync("POST", $"channels/{channelId}/messages/bulk_delete", args, options: options).ConfigureAwait(false);
+                        await SendAsync("POST", $"channels/{channelId}/messages/bulk-delete", args, options: options).ConfigureAwait(false);
                     break;
             }
         }
