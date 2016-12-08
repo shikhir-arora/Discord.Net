@@ -22,7 +22,7 @@
   "configurations": {
     "GlobalNadeko": {
       "buildOptions": {
-        "define": [ "RELEASE" ],
+        "define": [ "GLOBAL_NADEKO" ],
         "nowarn": [ "CS1573", "CS1591" ],
         "optimize": true
       }
