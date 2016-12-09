@@ -183,7 +183,7 @@ namespace Discord.Commands
             var matches = _map.GetCommands(searchInput).OrderByDescending(x => x.Priority).ToImmutableArray();
             
             if (matches.Length > 0)
-                return SearchResult.FromSuccess(input, matches);
+                return SearchResult.FromSuccess(searchInput, matches);
             else
                 return SearchResult.FromError(CommandError.UnknownCommand, "Unknown command.");
         }
