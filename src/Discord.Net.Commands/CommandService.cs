@@ -179,11 +179,10 @@ namespace Discord.Commands
         public SearchResult Search(IUserMessage message, int argPos) => Search(message, message.Content.Substring(argPos));
         public SearchResult Search(IUserMessage message, string input)
         {
-            string searchInput = input.ToLowerInvariant();
-            var matches = _map.GetCommands(searchInput).OrderByDescending(x => x.Priority).ToImmutableArray();
+            var matches = _map.GetCommands(input.ToLowerInvariant()).OrderByDescending(x => x.Priority).ToImmutableArray();
             
             if (matches.Length > 0)
-                return SearchResult.FromSuccess(searchInput, matches);
+                return SearchResult.FromSuccess(input, matches);
             else
                 return SearchResult.FromError(CommandError.UnknownCommand, "Unknown command.");
         }

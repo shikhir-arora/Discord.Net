@@ -109,7 +109,7 @@ namespace Discord.Commands
                 return ParseResult.FromError(preconditionResult.Value);
 
             string input = searchResult.Text;
-            var matchingAliases = Aliases.Where(alias => input.StartsWith(alias));
+            var matchingAliases = Aliases.Where(alias => input.ToLowerInvariant().StartsWith(alias));
             
             string matchingAlias = "";
             foreach (string alias in matchingAliases)
