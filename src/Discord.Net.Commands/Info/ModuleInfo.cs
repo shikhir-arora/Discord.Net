@@ -10,6 +10,7 @@ namespace Discord.Commands
     public class ModuleInfo
     {
         public CommandService Service { get; }
+        public string Prefix { get; }
         public string Name { get; }
         public string Summary { get; }
         public string Remarks { get; }
@@ -25,9 +26,10 @@ namespace Discord.Commands
         {
             Service = service;
 
-            Name = builder.Name;
+            Prefix = builder.Prefix;
             Summary = builder.Summary;
             Remarks = builder.Remarks;
+            Name = builder.Name;
             Parent = parent;
 
             Aliases = BuildAliases(builder).ToImmutableArray();
@@ -60,9 +62,9 @@ namespace Discord.Commands
                         result = level.Aliases.ToList(); //create a shallow copy so we don't overwrite the builder unexpectedly
                 }
                 else if (result.Count() > level.Aliases.Count)
-                    result = result.Permutate(level.Aliases, (first, second) => first + " " + second);
+                    result = result.Permutate(level.Aliases, (first, second) => first + second);
                 else
-                    result = level.Aliases.Permutate(result, (second, first) => first + " " + second);
+                    result = level.Aliases.Permutate(result, (second, first) => first + second);
             }
 
             if (result == null) //there were no aliases; default to an empty list

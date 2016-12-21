@@ -83,7 +83,7 @@ namespace Discord.Commands
             {
                 // TODO: C#7 type switch
                 if (attribute is NameAttribute)
-                    builder.Name = (attribute as NameAttribute).Text;
+                    builder.Prefix = (attribute as NameAttribute).Text;
                 else if (attribute is SummaryAttribute)
                     builder.Summary = (attribute as SummaryAttribute).Text;
                 else if (attribute is RemarksAttribute)
@@ -93,15 +93,16 @@ namespace Discord.Commands
                 else if (attribute is GroupAttribute)
                 {
                     var groupAttr = attribute as GroupAttribute;
-                    builder.Name = builder.Name ?? groupAttr.Prefix;
+                    builder.Prefix = builder.Prefix ?? groupAttr.Prefix;
+                    builder.Name = groupAttr.Name ?? builder.Parent.Name;
                     builder.AddAlias(groupAttr.Prefix);
                 }
                 else if (attribute is PreconditionAttribute)
                     builder.AddPrecondition(attribute as PreconditionAttribute);
             }
 
-            if (builder.Name == null)
-                builder.Name = typeInfo.Name;
+            if (builder.Prefix == null)
+                builder.Prefix = typeInfo.Name;
 
             var validCommands = typeInfo.DeclaredMethods.Where(x => IsValidCommandDefinition(x));
 

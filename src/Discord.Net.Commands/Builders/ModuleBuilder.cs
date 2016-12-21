@@ -13,6 +13,7 @@ namespace Discord.Commands.Builders
 
         public CommandService Service { get; }
         public ModuleBuilder Parent { get; }
+        public string Prefix { get; set; }
         public string Name { get; set; }
         public string Summary { get; set; }
         public string Remarks { get; set; }
@@ -42,9 +43,9 @@ namespace Discord.Commands.Builders
             _aliases = new List<string> { primaryAlias };
         }
 
-        public ModuleBuilder WithName(string name)
+        public ModuleBuilder WithPrefix(string name)
         {
-            Name = name;
+            Prefix = name;
             return this;
         }
         public ModuleBuilder WithSummary(string summary)
@@ -100,8 +101,8 @@ namespace Discord.Commands.Builders
         private ModuleInfo BuildImpl(CommandService service, ModuleInfo parent = null)
         {
             //Default name to first alias
-            if (Name == null)
-                Name = _aliases[0];
+            if (Prefix == null)
+                Prefix = _aliases[0];
 
             return new ModuleInfo(this, service, parent);
         }
