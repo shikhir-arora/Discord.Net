@@ -5,7 +5,9 @@
         public static string GetApplicationIconUrl(ulong appId, string iconId)
             => iconId != null ? $"{DiscordConfig.CDNUrl}app-icons/{appId}/{iconId}.jpg" : null;
         public static string GetUserAvatarUrl(ulong userId, string avatarId)
-            => avatarId != null ? $"{DiscordConfig.CDNUrl}avatars/{userId}/{avatarId}.jpg" : null;
+            => avatarId != null ? (avatarId.StartsWith("a_") 
+                ? $"{DiscordConfig.CDNUrl}avatars/{userId}/{avatarId}.gif" 
+                : $"{DiscordConfig.CDNUrl}avatars/{userId}/{avatarId}.jpg") : null;
         public static string GetGuildIconUrl(ulong guildId, string iconId)
             => iconId != null ? $"{DiscordConfig.CDNUrl}icons/{guildId}/{iconId}.jpg" : null;
         public static string GetGuildSplashUrl(ulong guildId, string splashId)
