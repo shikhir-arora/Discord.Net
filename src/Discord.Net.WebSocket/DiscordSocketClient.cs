@@ -126,7 +126,7 @@ namespace Discord.WebSocket
             _largeGuilds = new ConcurrentQueue<ulong>();
         }
         private static API.DiscordSocketApiClient CreateApiClient(DiscordSocketConfig config)
-            => new API.DiscordSocketApiClient(config.RestClientProvider, DiscordRestConfig.UserAgent, config.WebSocketProvider, requestQueue: new RequestQueue());
+            => new API.DiscordSocketApiClient(config.RestClientProvider, DiscordRestConfig.UserAgent, config.WebSocketProvider);
         
         protected override async Task OnLoginAsync(TokenType tokenType, string token)
         {
@@ -1563,10 +1563,10 @@ namespace Discord.WebSocket
                                             {
                                                 before = guild.GetVoiceState(data.UserId)?.Clone() ?? SocketVoiceState.Default;
                                                 after = guild.AddOrUpdateVoiceState(State, data);
-                                                if (data.UserId == CurrentUser.Id)
+                                                /*if (data.UserId == CurrentUser.Id)
                                                 {
                                                     var _ = guild.FinishJoinAudioChannel().ConfigureAwait(false);
-                                                }
+                                                }*/
                                             }
                                             else
                                             {
@@ -1773,8 +1773,6 @@ namespace Discord.WebSocket
         }
 
         //IDiscordClient
-        DiscordRestApiClient IDiscordClient.ApiClient => ApiClient;
-
         Task IDiscordClient.ConnectAsync()
             => ConnectAsync();
 

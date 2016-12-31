@@ -10,7 +10,7 @@ namespace Discord.Commands
 {
     internal static class ModuleClassBuilder
     {
-        private static readonly TypeInfo _moduleTypeInfo = typeof(ModuleBase).GetTypeInfo();
+        private static readonly TypeInfo _moduleTypeInfo = typeof(IModuleBase).GetTypeInfo();
 
         public static IEnumerable<TypeInfo> Search(Assembly assembly)
         {
@@ -89,20 +89,22 @@ namespace Discord.Commands
                 else if (attribute is RemarksAttribute)
                     builder.Remarks = (attribute as RemarksAttribute).Text;
                 else if (attribute is AliasAttribute)
-                    builder.AddAlias((attribute as AliasAttribute).Aliases);
+                    builder.AddAliases((attribute as AliasAttribute).Aliases);
                 else if (attribute is GroupAttribute)
                 {
                     var groupAttr = attribute as GroupAttribute;
-                    builder.Prefix = builder.Prefix ?? groupAttr.Prefix;
-                    builder.Name = groupAttr.Name ?? builder.Parent.Name;
-                    builder.AddAlias(groupAttr.Prefix);
+                    builder.Name = builder.Name ?? groupAttr.Prefix;
+                    builder.AddAliases(groupAttr.Prefix);
                 }
                 else if (attribute is PreconditionAttribute)
                     builder.AddPrecondition(attribute as PreconditionAttribute);
             }
 
-            if (builder.Prefix == null)
-                builder.Prefix = typeInfo.Name;
+            //Check for unspecified info
+            if (builder.Aliases.Count == 0)
+                builder.AddAliases("");
+            if (builder.Name == null)
+                builder.Name = typeInfo.Name;
 
             var validCommands = typeInfo.DeclaredMethods.Where(x => IsValidCommandDefinition(x));
 
@@ -156,12 +158,12 @@ namespace Discord.Commands
                 });
             }
 
-            var createInstance = ReflectionUtils.CreateBuilder<ModuleBase>(typeInfo, service);
+            var createInstance = ReflectionUtils.CreateBuilder<IModuleBase>(typeInfo, service);
 
             builder.Callback = (ctx, args, map) => 
             {
                 var instance = createInstance(map);
-                instance.Context = ctx;
+                instance.SetContext(ctx);
                 try
                 {
                     return method.Invoke(instance, args) as Task ?? Task.Delay(0);
@@ -216,20 +218,6 @@ namespace Discord.Commands
                 else
                     reader = service.GetDefaultTypeReader(paramType);
 
-                if (reader == null)
-                {
-                    var paramTypeInfo = paramType.GetTypeInfo();
-                    if (paramTypeInfo.IsEnum)
-                    {
-                        reader = EnumTypeReader.GetReader(paramType);
-                        service.AddTypeReader(paramType, reader);
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException($"{paramType.FullName} is not supported as a command parameter, are you missing a TypeReader?");
-                    }
-                }
-
                 builder.ParameterType = paramType;
                 builder.TypeReader = reader;
             }
@@ -240,10 +228,12 @@ namespace Discord.Commands
             var readers = service.GetTypeReaders(paramType);
             TypeReader reader = null;
             if (readers != null)
+            {
                 if (readers.TryGetValue(typeReaderType, out reader))
                     return reader;
+            }
 
-            //could not find any registered type reader: try to create one
+            //We dont have a cached type reader, create one
             reader = ReflectionUtils.CreateObject<TypeReader>(typeReaderType.GetTypeInfo(), service, DependencyMap.Empty);
             service.AddTypeReader(paramType, reader);
 

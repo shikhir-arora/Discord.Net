@@ -17,10 +17,12 @@ namespace Discord.Commands
         private readonly ConcurrentDictionary<Type, ModuleInfo> _typedModuleDefs;
         private readonly ConcurrentDictionary<Type, ConcurrentDictionary<Type, TypeReader>> _typeReaders;
         private readonly ConcurrentDictionary<Type, TypeReader> _defaultTypeReaders;
+        private readonly ImmutableList<Tuple<Type, Type>> _entityTypeReaders; //TODO: Candidate for C#7 Tuple
         private readonly ConcurrentBag<ModuleInfo> _moduleDefs;
         private readonly CommandMap _map;
 
         internal readonly bool _caseSensitive;
+        internal readonly char _separatorChar;
         internal readonly RunMode _defaultRunMode;
 
         public IEnumerable<ModuleInfo> Modules => _moduleDefs.Select(x => x);
@@ -30,36 +32,26 @@ namespace Discord.Commands
         public CommandService() : this(new CommandServiceConfig()) { }
         public CommandService(CommandServiceConfig config)
         {
+            _caseSensitive = config.CaseSensitiveCommands;
+            _separatorChar = config.SeparatorChar;
+            _defaultRunMode = config.DefaultRunMode;
+
             _moduleLock = new SemaphoreSlim(1, 1);
             _typedModuleDefs = new ConcurrentDictionary<Type, ModuleInfo>();
             _moduleDefs = new ConcurrentBag<ModuleInfo>();
-            _map = new CommandMap();
+            _map = new CommandMap(this);
             _typeReaders = new ConcurrentDictionary<Type, ConcurrentDictionary<Type, TypeReader>>();
 
-            _defaultTypeReaders = new ConcurrentDictionary<Type, TypeReader>
-            {                
-                [typeof(IMessage)] = new MessageTypeReader<IMessage>(),
-                [typeof(IUserMessage)] = new MessageTypeReader<IUserMessage>(),
-                [typeof(IChannel)] = new ChannelTypeReader<IChannel>(),
-                [typeof(IDMChannel)] = new ChannelTypeReader<IDMChannel>(),
-                [typeof(IGroupChannel)] = new ChannelTypeReader<IGroupChannel>(),
-                [typeof(IGuildChannel)] = new ChannelTypeReader<IGuildChannel>(),
-                [typeof(IMessageChannel)] = new ChannelTypeReader<IMessageChannel>(),
-                [typeof(IPrivateChannel)] = new ChannelTypeReader<IPrivateChannel>(),
-                [typeof(ITextChannel)] = new ChannelTypeReader<ITextChannel>(),
-                [typeof(IVoiceChannel)] = new ChannelTypeReader<IVoiceChannel>(),
-
-                [typeof(IRole)] = new RoleTypeReader<IRole>(),
-
-                [typeof(IUser)] = new UserTypeReader<IUser>(),
-                [typeof(IGroupUser)] = new UserTypeReader<IGroupUser>(),
-                [typeof(IGuildUser)] = new UserTypeReader<IGuildUser>(),
-            };
+            _defaultTypeReaders = new ConcurrentDictionary<Type, TypeReader>();
             foreach (var type in PrimitiveParsers.SupportedTypes)
                 _defaultTypeReaders[type] = PrimitiveTypeReader.Create(type);
 
-            _caseSensitive = config.CaseSensitiveCommands;
-            _defaultRunMode = config.DefaultRunMode;
+            var entityTypeReaders = ImmutableList.CreateBuilder<Tuple<Type, Type>>();
+            entityTypeReaders.Add(new Tuple<Type, Type>(typeof(IMessage), typeof(MessageTypeReader<>)));
+            entityTypeReaders.Add(new Tuple<Type, Type>(typeof(IChannel), typeof(ChannelTypeReader<>)));
+            entityTypeReaders.Add(new Tuple<Type, Type>(typeof(IRole), typeof(RoleTypeReader<>)));
+            entityTypeReaders.Add(new Tuple<Type, Type>(typeof(IUser), typeof(UserTypeReader<>)));
+            _entityTypeReaders = entityTypeReaders.ToImmutable();
         }
 
         //Modules
@@ -206,15 +198,36 @@ namespace Discord.Commands
             TypeReader reader;
             if (_defaultTypeReaders.TryGetValue(type, out reader))
                 return reader;
+            var typeInfo = type.GetTypeInfo();
+
+            //Is this an enum?
+            if (typeInfo.IsEnum)
+            {
+                reader = EnumTypeReader.GetReader(type);
+                _defaultTypeReaders[type] = reader;
+                return reader;
+            }
+
+            //Is this an entity?
+            for (int i = 0; i < _entityTypeReaders.Count; i++)
+            {
+                if (type == _entityTypeReaders[i].Item1 || typeInfo.ImplementedInterfaces.Contains(_entityTypeReaders[i].Item1))
+                {
+                    reader = Activator.CreateInstance(_entityTypeReaders[i].Item2.MakeGenericType(type)) as TypeReader;
+                    _defaultTypeReaders[type] = reader;
+                    return reader;
+                }
+            }
             return null;
         }
 
         //Execution
-        public SearchResult Search(CommandContext context, int argPos) => Search(context, context.Message.Content.Substring(argPos));
-        public SearchResult Search(CommandContext context, string input)
+        public SearchResult Search(ICommandContext context, int argPos) 
+            => Search(context, context.Message.Content.Substring(argPos));
+        public SearchResult Search(ICommandContext context, string input)
         {
             string searchInput = _caseSensitive ? input : input.ToLowerInvariant();
-            var matches = _map.GetCommands(searchInput).OrderByDescending(x => x.Priority).ToImmutableArray();
+            var matches = _map.GetCommands(searchInput).OrderByDescending(x => x.Command.Priority).ToImmutableArray();
             
             if (matches.Length > 0)
                 return SearchResult.FromSuccess(input, matches);
@@ -222,9 +235,9 @@ namespace Discord.Commands
                 return SearchResult.FromError(CommandError.UnknownCommand, "Unknown command.");
         }
 
-        public Task<IResult> ExecuteAsync(CommandContext context, int argPos, IDependencyMap dependencyMap = null, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception)
+        public Task<IResult> ExecuteAsync(ICommandContext context, int argPos, IDependencyMap dependencyMap = null, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception)
             => ExecuteAsync(context, context.Message.Content.Substring(argPos), dependencyMap, multiMatchHandling);
-        public async Task<IResult> ExecuteAsync(CommandContext context, string input, IDependencyMap dependencyMap = null, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception)
+        public async Task<IResult> ExecuteAsync(ICommandContext context, string input, IDependencyMap dependencyMap = null, MultiMatchHandling multiMatchHandling = MultiMatchHandling.Exception)
         {
             dependencyMap = dependencyMap ?? DependencyMap.Empty;
 
@@ -269,7 +282,7 @@ namespace Discord.Commands
                     }
                 }
 
-                return await commands[i].Execute(context, parseResult, dependencyMap).ConfigureAwait(false);
+                return await commands[i].ExecuteAsync(context, parseResult, dependencyMap).ConfigureAwait(false);
             }
 
             return SearchResult.FromError(CommandError.UnknownCommand, "This input does not match any overload.");

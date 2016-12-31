@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Discord.Audio
 {
     internal class RTPWriteStream : Stream
     {
-        private readonly AudioClient _audioClient;
+        private readonly IAudioTarget _target;
         private readonly byte[] _nonce, _secretKey;
         private int _samplesPerFrame;
         private uint _ssrc, _timestamp = 0;
@@ -16,13 +18,13 @@ namespace Discord.Audio
         public override bool CanSeek => false;
         public override bool CanWrite => true;
 
-        internal RTPWriteStream(AudioClient audioClient, byte[] secretKey, int samplesPerFrame, uint ssrc, int bufferSize = 4000)
+        internal RTPWriteStream(IAudioTarget target, byte[] secretKey, int samplesPerFrame, uint ssrc)
         {
-            _audioClient = audioClient;
+            _target = target;
             _secretKey = secretKey;
             _samplesPerFrame = samplesPerFrame;
             _ssrc = ssrc;
-            _buffer = new byte[bufferSize];
+            _buffer = new byte[4000];
             _nonce = new byte[24];
             _nonce[0] = 0x80;
             _nonce[1] = 0x78;
@@ -33,6 +35,10 @@ namespace Discord.Audio
         }
 
         public override void Write(byte[] buffer, int offset, int count)
+        {
+            WriteAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+        }
+        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             unchecked
             {
@@ -48,10 +54,17 @@ namespace Discord.Audio
 
             count = SecretBox.Encrypt(buffer, offset, count, _buffer, 12, _nonce, _secretKey);
             Buffer.BlockCopy(_nonce, 0, _buffer, 0, 12); //Copy the RTP header from nonce to buffer
-            _audioClient.Send(_buffer, count + 12);
+            await _target.SendAsync(_buffer, count + 12).ConfigureAwait(false);
         }
 
-        public override void Flush() { }
+        public override void Flush()
+        {
+            FlushAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await _target.FlushAsync().ConfigureAwait(false);
+        }
 
         public override long Length { get { throw new NotSupportedException(); } }
         public override long Position

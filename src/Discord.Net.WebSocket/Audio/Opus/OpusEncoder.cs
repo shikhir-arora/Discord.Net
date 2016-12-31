@@ -52,13 +52,13 @@ namespace Discord.Audio
                 throw new Exception($"Opus Error: {(OpusError)result}");
         }
 
-        /// <summary> Gets or sets whether Forward Error Correction is enabled. </summary>
+        /// <summary> Gets or sets the encoder's bitrate. </summary>
         public void SetBitrate(int value)
         {
             if (value < 1 || value > DiscordVoiceAPIClient.MaxBitrate)
                 throw new ArgumentOutOfRangeException(nameof(value));
 
-            var result = EncoderCtl(_ptr, OpusCtl.SetBitrateRequest, value * 1000);
+            var result = EncoderCtl(_ptr, OpusCtl.SetBitrateRequest, value);
             if (result < 0)
                 throw new Exception($"Opus Error: {(OpusError)result}");
         }

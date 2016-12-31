@@ -59,9 +59,14 @@ namespace Discord.Commands.Builders
             return this;
         }
 
-        public ModuleBuilder AddAlias(params string[] newAliases)
+        public ModuleBuilder AddAliases(params string[] aliases)
         {
-            _aliases.AddRange(newAliases);
+            for (int i = 0; i < aliases.Length; i++)
+            {
+                var alias = aliases[i] ?? "";
+                if (!_aliases.Contains(alias))
+                    _aliases.Add(alias);
+            }
             return this;
         }
         public ModuleBuilder AddPrecondition(PreconditionAttribute precondition)
@@ -69,7 +74,7 @@ namespace Discord.Commands.Builders
             _preconditions.Add(precondition);
             return this;
         }
-        public ModuleBuilder AddCommand(string primaryAlias, Func<CommandContext, object[], IDependencyMap, Task> callback, Action<CommandBuilder> createFunc)
+        public ModuleBuilder AddCommand(string primaryAlias, Func<ICommandContext, object[], IDependencyMap, Task> callback, Action<CommandBuilder> createFunc)
         {
             var builder = new CommandBuilder(this, primaryAlias, callback);
             createFunc(builder);

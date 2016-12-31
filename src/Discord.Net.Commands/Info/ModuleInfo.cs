@@ -16,7 +16,7 @@ namespace Discord.Commands
         public string Remarks { get; }
 
         public IReadOnlyList<string> Aliases { get; }
-        public IEnumerable<CommandInfo> Commands { get; }
+        public IReadOnlyList<CommandInfo> Commands { get; }
         public IReadOnlyList<PreconditionAttribute> Preconditions { get; }
         public IReadOnlyList<ModuleInfo> Submodules { get; }
         public ModuleInfo Parent { get; }
@@ -32,43 +32,35 @@ namespace Discord.Commands
             Name = builder.Name;
             Parent = parent;
 
-            Aliases = BuildAliases(builder).ToImmutableArray();
-            Commands = builder.Commands.Select(x => x.Build(this, service));
+            Aliases = BuildAliases(builder, service).ToImmutableArray();
+            Commands = builder.Commands.Select(x => x.Build(this, service)).ToImmutableArray();
             Preconditions = BuildPreconditions(builder).ToImmutableArray();
 
             Submodules = BuildSubmodules(builder, service).ToImmutableArray();
         }
 
-        private static IEnumerable<string> BuildAliases(ModuleBuilder builder)
+        private static IEnumerable<string> BuildAliases(ModuleBuilder builder, CommandService service)
         {
-            IEnumerable<string> result = null;
+            var result = builder.Aliases.ToList();
+            var builderStack = new Stack<ModuleBuilder>();
 
-            Stack<ModuleBuilder> builderStack = new Stack<ModuleBuilder>();
-            builderStack.Push(builder);
-
-            ModuleBuilder parent = builder.Parent;
-            while (parent != null)
-            {
+            var parent = builder;
+            while ((parent = parent.Parent) != null)
                 builderStack.Push(parent);
-                parent = parent.Parent;
-            }
 
-            while (builderStack.Count() > 0)
+            while (builderStack.Count > 0)
             {
-                ModuleBuilder level = builderStack.Pop(); //get the topmost builder
-                if (result == null)
+                var level = builderStack.Pop();
+                result = result.Permutate(level.Aliases, (first, second) =>
                 {
-                    if (level.Aliases.Count > 0)
-                        result = level.Aliases.ToList(); //create a shallow copy so we don't overwrite the builder unexpectedly
-                }
-                else if (result.Count() > level.Aliases.Count)
-                    result = result.Permutate(level.Aliases, (first, second) => first + second);
-                else
-                    result = level.Aliases.Permutate(result, (second, first) => first + second);
+                    if (first == "")
+                        return second;
+                    else if (second == "")
+                        return first;
+                    else
+                        return first + service._separatorChar + second;
+                }).ToList();
             }
-
-            if (result == null) //there were no aliases; default to an empty list
-                result = new List<string>();
 
             return result;
         }
@@ -78,9 +70,7 @@ namespace Discord.Commands
             var result = new List<ModuleInfo>();
 
             foreach (var submodule in parent.Modules)
-            {
                 result.Add(submodule.Build(service, this));
-            }
 
             return result;
         }

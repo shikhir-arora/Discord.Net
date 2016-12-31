@@ -35,8 +35,8 @@ namespace Discord.Rest
 
         public DateTimeOffset CreatedAt => DateTimeUtils.FromSnowflake(Id);
         public ulong DefaultChannelId => Id;
-        public string IconUrl => API.CDN.GetGuildIconUrl(Id, IconId);
-        public string SplashUrl => API.CDN.GetGuildSplashUrl(Id, SplashId);
+        public string IconUrl => CDN.GetGuildIconUrl(Id, IconId);
+        public string SplashUrl => CDN.GetGuildSplashUrl(Id, SplashId);
 
         public RestRole EveryoneRole => GetRole(Id);
         public IReadOnlyCollection<RestRole> Roles => _roles.ToReadOnlyCollection();
@@ -105,22 +105,22 @@ namespace Discord.Rest
         public Task DeleteAsync(RequestOptions options = null)
             => GuildHelper.DeleteAsync(this, Discord, options);
 
-        public async Task ModifyAsync(Action<ModifyGuildParams> func, RequestOptions options = null)
+        public async Task ModifyAsync(Action<GuildProperties> func, RequestOptions options = null)
         {
             var model = await GuildHelper.ModifyAsync(this, Discord, func, options).ConfigureAwait(false);
             Update(model);
         }
-        public async Task ModifyEmbedAsync(Action<ModifyGuildEmbedParams> func, RequestOptions options = null)
+        public async Task ModifyEmbedAsync(Action<GuildEmbedProperties> func, RequestOptions options = null)
         { 
             var model = await GuildHelper.ModifyEmbedAsync(this, Discord, func, options).ConfigureAwait(false);
             Update(model);
         }
-        public async Task ModifyChannelsAsync(IEnumerable<ModifyGuildChannelsParams> args, RequestOptions options = null)
+        public async Task ModifyChannelsAsync(IEnumerable<BulkGuildChannelProperties> args, RequestOptions options = null)
         {
             var arr = args.ToArray();
             await GuildHelper.ModifyChannelsAsync(this, Discord, arr, options);
         }
-        public async Task ModifyRolesAsync(IEnumerable<ModifyGuildRolesParams> args, RequestOptions options = null)
+        public async Task ModifyRolesAsync(IEnumerable<BulkRoleProperties> args, RequestOptions options = null)
         {
             var models = await GuildHelper.ModifyRolesAsync(this, Discord, args, options).ConfigureAwait(false);
             foreach (var model in models)

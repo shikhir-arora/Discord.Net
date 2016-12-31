@@ -53,8 +53,8 @@ namespace Discord.WebSocket
 
         public DateTimeOffset CreatedAt => DateTimeUtils.FromSnowflake(Id);
         public ulong DefaultChannelId => Id;
-        public string IconUrl => API.CDN.GetGuildIconUrl(Id, IconId);
-        public string SplashUrl => API.CDN.GetGuildSplashUrl(Id, SplashId);
+        public string IconUrl => CDN.GetGuildIconUrl(Id, IconId);
+        public string SplashUrl => CDN.GetGuildSplashUrl(Id, SplashId);
         public bool HasAllMembers => _downloaderPromise.Task.IsCompleted;
         public bool IsSynced => _syncPromise.Task.IsCompleted;
         public Task SyncPromise => _syncPromise.Task;
@@ -252,13 +252,13 @@ namespace Discord.WebSocket
         public Task DeleteAsync(RequestOptions options = null)
             => GuildHelper.DeleteAsync(this, Discord, options);
 
-        public Task ModifyAsync(Action<ModifyGuildParams> func, RequestOptions options = null)
+        public Task ModifyAsync(Action<GuildProperties> func, RequestOptions options = null)
             => GuildHelper.ModifyAsync(this, Discord, func, options);
-        public Task ModifyEmbedAsync(Action<ModifyGuildEmbedParams> func, RequestOptions options = null)
+        public Task ModifyEmbedAsync(Action<GuildEmbedProperties> func, RequestOptions options = null)
             => GuildHelper.ModifyEmbedAsync(this, Discord, func, options);
-        public Task ModifyChannelsAsync(IEnumerable<ModifyGuildChannelsParams> args, RequestOptions options = null)
+        public Task ModifyChannelsAsync(IEnumerable<BulkGuildChannelProperties> args, RequestOptions options = null)
             => GuildHelper.ModifyChannelsAsync(this, Discord, args, options);
-        public Task ModifyRolesAsync(IEnumerable<ModifyGuildRolesParams> args, RequestOptions options = null)
+        public Task ModifyRolesAsync(IEnumerable<BulkRoleProperties> args, RequestOptions options = null)
             => GuildHelper.ModifyRolesAsync(this, Discord, args, options);
 
         public Task LeaveAsync(RequestOptions options = null)
@@ -421,34 +421,64 @@ namespace Discord.WebSocket
         }
 
         //Audio
-        public async Task DisconnectAudioAsync(AudioClient client = null)
+        internal async Task<IAudioClient> ConnectAudioAsync(ulong channelId, bool selfDeaf, bool selfMute)
+        {
+            selfDeaf = false;
+            selfMute = false;
+
+            TaskCompletionSource<AudioClient> promise;
+
+            await _audioLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await DisconnectAudioInternalAsync().ConfigureAwait(false);
+                promise = new TaskCompletionSource<AudioClient>();
+                _audioConnectPromise = promise;
+                await Discord.ApiClient.SendVoiceStateUpdateAsync(Id, channelId, selfDeaf, selfMute).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                await DisconnectAudioInternalAsync().ConfigureAwait(false);
+                throw;
+            }
+            finally
+            {
+                _audioLock.Release();
+            }
+
+            try
+            {
+                var timeoutTask = Task.Delay(15000);
+                if (await Task.WhenAny(promise.Task, timeoutTask) == timeoutTask)
+                    throw new TimeoutException();
+                return await promise.Task.ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                await DisconnectAudioAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        internal async Task DisconnectAudioAsync()
         {
             await _audioLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                await DisconnectAudioInternalAsync(client).ConfigureAwait(false);
+                await DisconnectAudioInternalAsync().ConfigureAwait(false);
             }
             finally
             {
                 _audioLock.Release();
             }
         }
-        private async Task DisconnectAudioInternalAsync(AudioClient client = null)
+        private async Task DisconnectAudioInternalAsync()
         {
-            var oldClient = AudioClient;
-            if (oldClient != null)
-            {
-                if (client == null || oldClient == client)
-                {
-                    _audioConnectPromise?.TrySetCanceledAsync(); //Cancel any previous audio connection
-                    _audioConnectPromise = null;
-                }
-                if (oldClient == client)
-                {
-                    AudioClient = null;
-                    await oldClient.DisconnectAsync().ConfigureAwait(false);
-                }
-            }
+            _audioConnectPromise?.TrySetCanceledAsync(); //Cancel any previous audio connection
+            _audioConnectPromise = null;
+            if (AudioClient != null)
+                await AudioClient.DisconnectAsync().ConfigureAwait(false);
+            AudioClient = null;
         }
         internal async Task FinishConnectAudio(int id, string url, string token)
         {
@@ -460,9 +490,23 @@ namespace Discord.WebSocket
                 if (AudioClient == null)
                 {
                     var audioClient = new AudioClient(this, id);
+                    var promise = _audioConnectPromise;
                     audioClient.Disconnected += async ex =>
                     {
-                        await _audioLock.WaitAsync().ConfigureAwait(false);
+                        //If the initial connection hasn't been made yet, reconnecting will lead to deadlocks
+                        if (!promise.Task.IsCompleted)
+                        {
+                            try { audioClient.Dispose(); } catch { }
+                            AudioClient = null;
+                            if (ex != null)
+                                await promise.TrySetExceptionAsync(ex);
+                            else
+                                await promise.TrySetCanceledAsync();
+                            return;
+                        }
+
+                        //TODO: Implement reconnect
+                        /*await _audioLock.WaitAsync().ConfigureAwait(false);
                         try
                         {
                             if (AudioClient == audioClient) //Only reconnect if we're still assigned as this guild's audio client
@@ -476,20 +520,20 @@ namespace Discord.WebSocket
                                     {
                                         var voiceChannelId = voiceState2.Value.VoiceChannel?.Id;
                                         if (voiceChannelId != null)
+                                        {
                                             await Discord.ApiClient.SendVoiceStateUpdateAsync(Id, voiceChannelId, voiceState2.Value.IsSelfDeafened, voiceState2.Value.IsSelfMuted);
+                                            return;
+                                        }
                                     }
                                 }
-                                else
-                                {
-                                    try { AudioClient.Dispose(); } catch { }
-                                    AudioClient = null;
-                                }
+                                try { audioClient.Dispose(); } catch { }
+                                AudioClient = null;
                             }
                         }
                         finally
                         {
                             _audioLock.Release();
-                        }
+                        }*/
                     };
                     AudioClient = audioClient;
                 }
@@ -498,25 +542,12 @@ namespace Discord.WebSocket
             }
             catch (OperationCanceledException)
             {
-                await DisconnectAudioAsync().ConfigureAwait(false);
+                await DisconnectAudioInternalAsync().ConfigureAwait(false);
             }
             catch (Exception e)
             {
                 await _audioConnectPromise.SetExceptionAsync(e).ConfigureAwait(false);
-                await DisconnectAudioAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                _audioLock.Release();
-            }
-        }
-        internal async Task FinishJoinAudioChannel()
-        {
-            await _audioLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                if (AudioClient != null)
-                    await _audioConnectPromise.TrySetResultAsync(AudioClient).ConfigureAwait(false);
+                await DisconnectAudioInternalAsync().ConfigureAwait(false);
             }
             finally
             {
