@@ -53,12 +53,7 @@ namespace Discord.Commands
                 var level = builderStack.Pop();
                 result = result.Permutate(level.Aliases, (first, second) =>
                 {
-                    if (first == "")
-                        return second;
-                    else if (second == "")
-                        return first;
-                    else
-                        return first + service._separatorChar + second;
+                    return first + second;
                 }).ToList();
             }
 

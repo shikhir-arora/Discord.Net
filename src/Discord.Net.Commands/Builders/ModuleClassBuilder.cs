@@ -77,6 +77,10 @@ namespace Discord.Commands
 
         private static void BuildModule(ModuleBuilder builder, TypeInfo typeInfo, CommandService service)
         {
+            //gotta do this until i have the time to move everything from static fields/constructors over to 
+            // a service. This will ensure static constructors are ran >.<
+            var instance = ReflectionUtils.CreateBuilder<IModuleBase>(typeInfo, service).Invoke(DependencyMap.Empty);
+
             var attributes = typeInfo.GetCustomAttributes();
 
             foreach (var attribute in attributes)
@@ -93,7 +97,7 @@ namespace Discord.Commands
                 else if (attribute is GroupAttribute)
                 {
                     var groupAttr = attribute as GroupAttribute;
-                    builder.Name = builder.Name ?? groupAttr.Prefix;
+                    builder.Name = builder.Name ?? groupAttr.Name;
                     builder.AddAliases(groupAttr.Prefix);
                 }
                 else if (attribute is PreconditionAttribute)

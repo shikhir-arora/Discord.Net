@@ -45,12 +45,7 @@ namespace Discord.Commands
             Aliases = module.Aliases
                 .Permutate(builder.Aliases, (first, second) =>
                 {
-                    if (first == "")
-                        return second;
-                    else if (second == "")
-                        return first;
-                    else
-                        return first + service._separatorChar + second;
+                    return first + second;
                 })
                 .Select(x => service._caseSensitive ? x : x.ToLowerInvariant())
                 .ToImmutableArray();

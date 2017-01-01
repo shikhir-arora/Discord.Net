@@ -99,17 +99,17 @@ namespace Discord.Commands
                         yield return cmd;
                 }
 
-                //Check if this is the last command segment before args
-                nextSegment = NextSegment(text, index, _whitespaceChars, service._separatorChar);
-                if (nextSegment != -1)
-                {
-                    name = text.Substring(index, nextSegment - index);
-                    if (_nodes.TryGetValue(name, out nextNode))
-                    {
-                        foreach (var cmd in nextNode.GetCommands(service, nextSegment == -1 ? "" : text, nextSegment + 1, false))
-                            yield return cmd;
-                    }
-                }
+                ////Check if this is the last command segment before args
+                //nextSegment = NextSegment(text, index, _whitespaceChars, service._separatorChar);
+                //if (nextSegment != -1)
+                //{
+                //    name = text.Substring(index, nextSegment - index);
+                //    if (_nodes.TryGetValue(name, out nextNode))
+                //    {
+                //        foreach (var cmd in nextNode.GetCommands(service, nextSegment == -1 ? "" : text, nextSegment + 1, false))
+                //            yield return cmd;
+                //    }
+                //}
             }
         }
 
