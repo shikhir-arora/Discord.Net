@@ -2,6 +2,7 @@
 using Discord.Rest;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -29,6 +30,12 @@ namespace Discord.WebSocket
         public IReadOnlyCollection<DiscordSocketClient> Shards => _shards;
         public IReadOnlyCollection<RestVoiceRegion> VoiceRegions => _shards[0].VoiceRegions;
 
+        //my stuff
+        private uint _connectedCount = 0;
+        private uint _downloadedCount = 0;
+
+        private int _guildCount = 0;
+        
         /// <summary> Creates a new REST/WebSocket discord client. </summary>
         public DiscordShardedClient() : this(null, new DiscordSocketConfig()) { }
         /// <summary> Creates a new REST/WebSocket discord client. </summary>
@@ -125,11 +132,17 @@ namespace Discord.WebSocket
         }
         private async Task ConnectInternalAsync(bool waitForGuilds)
         {
+            var sw = new Stopwatch();
             for (int i = 0; i < _shards.Length; i++)
             {
+                sw.Restart();
                 await _shards[i].ConnectAsync(waitForGuilds).ConfigureAwait(false);
                 if (i == 0)
                     CurrentUser = _shards[i].CurrentUser;
+                sw.Stop();
+                _logEvent?.InvokeAsync(new LogMessage(LogSeverity.Warning, 
+                    "Client", 
+                    $"Shard #{_shards[i].ShardId} connected after {sw.Elapsed.TotalSeconds:F2}s ({++_connectedCount}/{_totalShards})"));
             }
         }
         /// <inheritdoc />
@@ -184,6 +197,10 @@ namespace Discord.WebSocket
             }
             return null;
         }
+
+        public Task<IDMChannel> GetDMChannelAsync(ulong channelId) =>
+            _shards[0].GetDMChannelAsync(channelId);
+
         private IEnumerable<ISocketPrivateChannel> GetPrivateChannels()
         {
             for (int i = 0; i < _shards.Length; i++)
@@ -204,7 +221,7 @@ namespace Discord.WebSocket
         public Task<IReadOnlyCollection<RestConnection>> GetConnectionsAsync()
             => ClientHelper.GetConnectionsAsync(this);
 
-        private IEnumerable<SocketGuild> GetGuilds()
+        public IEnumerable<SocketGuild> GetGuilds()
         {
             for (int i = 0; i < _shards.Length; i++)
             {
@@ -212,13 +229,7 @@ namespace Discord.WebSocket
                     yield return guild;
             }
         }
-        private int GetGuildCount()
-        {
-            int result = 0;
-            for (int i = 0; i < _shards.Length; i++)
-                result += _shards[i].Guilds.Count;
-            return result;
-        }
+        public int GetGuildCount() => _guildCount;
 
         /// <inheritdoc />
         public Task<RestInvite> GetInviteAsync(string inviteId)
@@ -254,8 +265,16 @@ namespace Discord.WebSocket
         /// <summary> Downloads the users list for all large guilds. </summary>
         public async Task DownloadAllUsersAsync()
         {
+            var sw = new Stopwatch();
             for (int i = 0; i < _shards.Length; i++)
+            {
+                sw.Restart();
                 await _shards[i].DownloadAllUsersAsync().ConfigureAwait(false);
+                sw.Stop();
+                _logEvent?.InvokeAsync(new LogMessage(LogSeverity.Warning,
+                    "Client",
+                    $"Shard #{_shards[i].ShardId} downloaded users after {sw.Elapsed.TotalSeconds:F2}s ({++_downloadedCount}/{_totalShards})"));
+            }
         }
         /// <summary> Downloads the users list for the provided guilds, if they don't have a complete list. </summary>
         public async Task DownloadUsersAsync(IEnumerable<SocketGuild> guilds)
@@ -282,40 +301,40 @@ namespace Discord.WebSocket
 
         private void RegisterEvents(DiscordSocketClient client)
         {
-            client.Log += (msg) => _logEvent.InvokeAsync(msg);
-            client.ChannelCreated += (channel) => _channelCreatedEvent.InvokeAsync(channel);
-            client.ChannelDestroyed += (channel) => _channelDestroyedEvent.InvokeAsync(channel);
-            client.ChannelUpdated += (oldChannel, newChannel) => _channelUpdatedEvent.InvokeAsync(oldChannel, newChannel);
+            client.Log += (msg) => { _logEvent.InvokeAsync(msg); return Task.FromResult(0); };
+            client.ChannelCreated += (channel) => { _channelCreatedEvent.InvokeAsync(channel); return Task.FromResult(0); };
+            client.ChannelDestroyed += (channel) => { _channelDestroyedEvent.InvokeAsync(channel); return Task.FromResult(0); };
+            client.ChannelUpdated += (oldChannel, newChannel) => { _channelUpdatedEvent.InvokeAsync(oldChannel, newChannel); return Task.FromResult(0); };
 
-            client.MessageReceived += (msg) => _messageReceivedEvent.InvokeAsync(msg);
-            client.MessageDeleted += (id, msg) => _messageDeletedEvent.InvokeAsync(id, msg);
-            client.MessageUpdated += (oldMsg, newMsg) => _messageUpdatedEvent.InvokeAsync(oldMsg, newMsg);
-            client.ReactionAdded += (id, msg, reaction) => _reactionAddedEvent.InvokeAsync(id, msg, reaction);
-            client.ReactionRemoved += (id, msg, reaction) => _reactionRemovedEvent.InvokeAsync(id, msg, reaction);
-            client.ReactionsCleared += (id, msg) => _reactionsClearedEvent.InvokeAsync(id, msg);
+            client.MessageReceived += (msg) => { _messageReceivedEvent.InvokeAsync(msg); return Task.FromResult(0); };
+            client.MessageDeleted += (id, msg) => { _messageDeletedEvent.InvokeAsync(id, msg); return Task.FromResult(0); };
+            client.MessageUpdated += (oldMsg, newMsg) => { _messageUpdatedEvent.InvokeAsync(oldMsg, newMsg); return Task.FromResult(0); };
+            client.ReactionAdded += (id, msg, reaction) => { _reactionAddedEvent.InvokeAsync(id, msg, reaction); return Task.FromResult(0); };
+            client.ReactionRemoved += (id, msg, reaction) => { _reactionRemovedEvent.InvokeAsync(id, msg, reaction); return Task.FromResult(0); };
+            client.ReactionsCleared += (id, msg) => { _reactionsClearedEvent.InvokeAsync(id, msg); return Task.FromResult(0); };
+            
+            client.RoleCreated += (role) => { _roleCreatedEvent.InvokeAsync(role); return Task.FromResult(0); };
+            client.RoleDeleted += (role) => { _roleDeletedEvent.InvokeAsync(role); return Task.FromResult(0); };
+            client.RoleUpdated += (oldRole, newRole) => { _roleUpdatedEvent.InvokeAsync(oldRole, newRole); return Task.FromResult(0); };
 
-            client.RoleCreated += (role) => _roleCreatedEvent.InvokeAsync(role);
-            client.RoleDeleted += (role) => _roleDeletedEvent.InvokeAsync(role);
-            client.RoleUpdated += (oldRole, newRole) => _roleUpdatedEvent.InvokeAsync(oldRole, newRole);
+            client.JoinedGuild += (guild) => { _joinedGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.LeftGuild += (guild) => { _leftGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.GuildAvailable += (guild) => { _guildAvailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.GuildUnavailable += (guild) => { _guildUnavailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.GuildMembersDownloaded += (guild) => { _guildMembersDownloadedEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.GuildUpdated += (oldGuild, newGuild) => { _guildUpdatedEvent.InvokeAsync(oldGuild, newGuild); return Task.FromResult(0); };
 
-            client.JoinedGuild += (guild) => _joinedGuildEvent.InvokeAsync(guild);
-            client.LeftGuild += (guild) => _leftGuildEvent.InvokeAsync(guild);
-            client.GuildAvailable += (guild) => _guildAvailableEvent.InvokeAsync(guild);
-            client.GuildUnavailable += (guild) => _guildUnavailableEvent.InvokeAsync(guild);
-            client.GuildMembersDownloaded += (guild) => _guildMembersDownloadedEvent.InvokeAsync(guild);
-            client.GuildUpdated += (oldGuild, newGuild) => _guildUpdatedEvent.InvokeAsync(oldGuild, newGuild);
-
-            client.UserJoined += (user) => _userJoinedEvent.InvokeAsync(user);
-            client.UserLeft += (user) => _userLeftEvent.InvokeAsync(user);
-            client.UserBanned += (user, guild) => _userBannedEvent.InvokeAsync(user, guild);
-            client.UserUnbanned += (user, guild) => _userUnbannedEvent.InvokeAsync(user, guild);
-            client.UserUpdated += (oldUser, newUser) => _userUpdatedEvent.InvokeAsync(oldUser, newUser);
-            client.UserPresenceUpdated += (guild, user, oldPresence, newPresence) => _userPresenceUpdatedEvent.InvokeAsync(guild, user, oldPresence, newPresence);
-            client.UserVoiceStateUpdated += (user, oldVoiceState, newVoiceState) => _userVoiceStateUpdatedEvent.InvokeAsync(user, oldVoiceState, newVoiceState);
-            client.CurrentUserUpdated += (oldUser, newUser) => _selfUpdatedEvent.InvokeAsync(oldUser, newUser);
-            client.UserIsTyping += (oldUser, newUser) => _userIsTypingEvent.InvokeAsync(oldUser, newUser);
-            client.RecipientAdded += (user) => _recipientAddedEvent.InvokeAsync(user);
-            client.RecipientAdded += (user) => _recipientRemovedEvent.InvokeAsync(user);
+            client.UserJoined += (user) => { _userJoinedEvent.InvokeAsync(user); return Task.FromResult(0); };
+            client.UserLeft += (user) => { _userLeftEvent.InvokeAsync(user); return Task.FromResult(0); };
+            client.UserBanned += (user, guild) => { _userBannedEvent.InvokeAsync(user, guild); return Task.FromResult(0); };
+            client.UserUnbanned += (user, guild) => { _userUnbannedEvent.InvokeAsync(user, guild); return Task.FromResult(0); };
+            client.UserUpdated += (oldUser, newUser) => { _userUpdatedEvent.InvokeAsync(oldUser, newUser); return Task.FromResult(0); };
+            client.UserPresenceUpdated += (guild, user, oldPresence, newPresence) => { _userPresenceUpdatedEvent.InvokeAsync(guild, user, oldPresence, newPresence); return Task.FromResult(0); };
+            client.UserVoiceStateUpdated += (user, oldVoiceState, newVoiceState) => { _userVoiceStateUpdatedEvent.InvokeAsync(user, oldVoiceState, newVoiceState); return Task.FromResult(0); };
+            client.CurrentUserUpdated += (oldUser, newUser) => { _selfUpdatedEvent.InvokeAsync(oldUser, newUser); return Task.FromResult(0); };
+            client.UserIsTyping += (oldUser, newUser) => { _userIsTypingEvent.InvokeAsync(oldUser, newUser); return Task.FromResult(0); };
+            client.RecipientAdded += (user) => { _recipientAddedEvent.InvokeAsync(user); return Task.FromResult(0); };
+            client.RecipientAdded += (user) => { _recipientRemovedEvent.InvokeAsync(user); return Task.FromResult(0); };
         }
 
         //IDiscordClient
