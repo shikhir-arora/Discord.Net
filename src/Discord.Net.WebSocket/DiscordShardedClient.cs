@@ -306,7 +306,13 @@ namespace Discord.WebSocket
             client.ChannelDestroyed += (channel) => { _channelDestroyedEvent.InvokeAsync(channel); return Task.FromResult(0); };
             client.ChannelUpdated += (oldChannel, newChannel) => { _channelUpdatedEvent.InvokeAsync(oldChannel, newChannel); return Task.FromResult(0); };
 
-            client.MessageReceived += (msg) => { _messageReceivedEvent.InvokeAsync(msg); return Task.FromResult(0); };
+            client.MessageReceived += (msg) =>
+            {
+                if (msg.Author == null || msg.Author.IsBot)
+                    return Task.FromResult(0);
+                _messageReceivedEvent.InvokeAsync(msg);
+                return Task.FromResult(0);
+            };
             client.MessageDeleted += (id, msg) => { _messageDeletedEvent.InvokeAsync(id, msg); return Task.FromResult(0); };
             client.MessageUpdated += (oldMsg, newMsg) => { _messageUpdatedEvent.InvokeAsync(oldMsg, newMsg); return Task.FromResult(0); };
             client.ReactionAdded += (id, msg, reaction) => { _reactionAddedEvent.InvokeAsync(id, msg, reaction); return Task.FromResult(0); };
@@ -317,8 +323,8 @@ namespace Discord.WebSocket
             client.RoleDeleted += (role) => { _roleDeletedEvent.InvokeAsync(role); return Task.FromResult(0); };
             client.RoleUpdated += (oldRole, newRole) => { _roleUpdatedEvent.InvokeAsync(oldRole, newRole); return Task.FromResult(0); };
 
-            client.JoinedGuild += (guild) => { _joinedGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
-            client.LeftGuild += (guild) => { _leftGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.JoinedGuild += (guild) => { ++_guildCount; _joinedGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.LeftGuild += (guild) => { --_guildCount; _leftGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildAvailable += (guild) => { _guildAvailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildUnavailable += (guild) => { _guildUnavailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildMembersDownloaded += (guild) => { _guildMembersDownloadedEvent.InvokeAsync(guild); return Task.FromResult(0); };
@@ -335,6 +341,9 @@ namespace Discord.WebSocket
             client.UserIsTyping += (oldUser, newUser) => { _userIsTypingEvent.InvokeAsync(oldUser, newUser); return Task.FromResult(0); };
             client.RecipientAdded += (user) => { _recipientAddedEvent.InvokeAsync(user); return Task.FromResult(0); };
             client.RecipientAdded += (user) => { _recipientRemovedEvent.InvokeAsync(user); return Task.FromResult(0); };
+
+            client.Ready += () => { _guildCount += client.Guilds.Count; return Task.FromResult(0); };
+            client.Disconnected += (ex) => { _guildCount -= client.Guilds.Count; return Task.FromResult(0); };
         }
 
         //IDiscordClient
