@@ -33,8 +33,6 @@ namespace Discord.WebSocket
         //my stuff
         private uint _connectedCount = 0;
         private uint _downloadedCount = 0;
-
-        private int _guildCount = 0;
         
         /// <summary> Creates a new REST/WebSocket discord client. </summary>
         public DiscordShardedClient() : this(null, new DiscordSocketConfig()) { }
@@ -229,7 +227,14 @@ namespace Discord.WebSocket
                     yield return guild;
             }
         }
-        public int GetGuildCount() => _guildCount;
+
+        public int GetGuildCount()
+        {
+            int result = 0;
+            for (int i = 0; i < _shards.Length; i++)
+                result += _shards[i].Guilds.Count;
+            return result;
+        }
 
         /// <inheritdoc />
         public Task<RestInvite> GetInviteAsync(string inviteId)
@@ -323,8 +328,8 @@ namespace Discord.WebSocket
             client.RoleDeleted += (role) => { _roleDeletedEvent.InvokeAsync(role); return Task.FromResult(0); };
             client.RoleUpdated += (oldRole, newRole) => { _roleUpdatedEvent.InvokeAsync(oldRole, newRole); return Task.FromResult(0); };
 
-            client.JoinedGuild += (guild) => { ++_guildCount; _joinedGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
-            client.LeftGuild += (guild) => { --_guildCount; _leftGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.JoinedGuild += (guild) => { _joinedGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.LeftGuild += (guild) => { _leftGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildAvailable += (guild) => { _guildAvailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildUnavailable += (guild) => { _guildUnavailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildMembersDownloaded += (guild) => { _guildMembersDownloadedEvent.InvokeAsync(guild); return Task.FromResult(0); };
@@ -341,9 +346,6 @@ namespace Discord.WebSocket
             client.UserIsTyping += (oldUser, newUser) => { _userIsTypingEvent.InvokeAsync(oldUser, newUser); return Task.FromResult(0); };
             client.RecipientAdded += (user) => { _recipientAddedEvent.InvokeAsync(user); return Task.FromResult(0); };
             client.RecipientAdded += (user) => { _recipientRemovedEvent.InvokeAsync(user); return Task.FromResult(0); };
-
-            client.Ready += () => { _guildCount += client.Guilds.Count; return Task.FromResult(0); };
-            client.Disconnected += (ex) => { _guildCount -= client.Guilds.Count; return Task.FromResult(0); };
         }
 
         //IDiscordClient
