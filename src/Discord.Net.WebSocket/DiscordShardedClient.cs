@@ -332,6 +332,7 @@ namespace Discord.WebSocket
             client.LeftGuild += (guild) => { _leftGuildEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildAvailable += (guild) => { _guildAvailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildUnavailable += (guild) => { _guildUnavailableEvent.InvokeAsync(guild); return Task.FromResult(0); };
+            client.GuildMemberUpdated += (oldUser, newUser) => { _guildMemberUpdatedEvent.InvokeAsync(oldUser, newUser); return Task.FromResult(0); };
             client.GuildMembersDownloaded += (guild) => { _guildMembersDownloadedEvent.InvokeAsync(guild); return Task.FromResult(0); };
             client.GuildUpdated += (oldGuild, newGuild) => { _guildUpdatedEvent.InvokeAsync(oldGuild, newGuild); return Task.FromResult(0); };
 
