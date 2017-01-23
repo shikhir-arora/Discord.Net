@@ -165,7 +165,7 @@ namespace Discord.WebSocket
                 return _shards[id];
             return null;
         }
-        private int GetShardIdFor(ulong guildId)
+        public int GetShardIdFor(ulong guildId)
             => (int)((guildId >> 22) % (uint)_totalShards);
         private int GetShardIdFor(IGuild guild)
             => GetShardIdFor(guild.Id);
