@@ -6,12 +6,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Discord.WebSocket
 {
     public partial class DiscordShardedClient : BaseDiscordClient, IDiscordClient
     {
         private readonly DiscordSocketConfig _baseConfig;
+        private readonly SemaphoreSlim _connectionGroupLock;
         private int[] _shardIds;
         private Dictionary<int, int> _shardIdsToIndex;
         private DiscordSocketClient[] _shards;
@@ -19,9 +21,9 @@ namespace Discord.WebSocket
         private bool _automaticShards;
         
         /// <summary> Gets the estimated round-trip latency, in milliseconds, to the gateway server. </summary>
-        public int Latency { get; private set; }
-        internal UserStatus Status => _shards[0].Status;
-        internal Game? Game => _shards[0].Game;
+        public int Latency => GetLatency();
+        public UserStatus Status => _shards[0].Status;
+        public Game? Game => _shards[0].Game;
 
         internal new DiscordSocketApiClient ApiClient => base.ApiClient as DiscordSocketApiClient;
         public new SocketSelfUser CurrentUser { get { return base.CurrentUser as SocketSelfUser; } private set { base.CurrentUser = value; } }
@@ -53,6 +55,7 @@ namespace Discord.WebSocket
             _shardIdsToIndex = new Dictionary<int, int>();
             config.DisplayInitialLog = false;
             _baseConfig = config;
+            _connectionGroupLock = new SemaphoreSlim(1, 1);
 
             if (config.TotalShards == null)
                 _automaticShards = true;
@@ -66,7 +69,7 @@ namespace Discord.WebSocket
                     _shardIdsToIndex.Add(_shardIds[i], i);
                     var newConfig = config.Clone();
                     newConfig.ShardId = _shardIds[i];
-                    _shards[i] = new DiscordSocketClient(newConfig);
+                    _shards[i] = new DiscordSocketClient(newConfig, _connectionGroupLock);
                     RegisterEvents(_shards[i]);
                 }
             }
@@ -88,7 +91,7 @@ namespace Discord.WebSocket
                     var newConfig = _baseConfig.Clone();
                     newConfig.ShardId = _shardIds[i];
                     newConfig.TotalShards = _totalShards;
-                    _shards[i] = new DiscordSocketClient(newConfig);
+                    _shards[i] = new DiscordSocketClient(newConfig, _connectionGroupLock);
                     RegisterEvents(_shards[i]);
                 }
             }
@@ -130,18 +133,11 @@ namespace Discord.WebSocket
         }
         private async Task ConnectInternalAsync(bool waitForGuilds)
         {
-            var sw = new Stopwatch();
-            for (int i = 0; i < _shards.Length; i++)
-            {
-                sw.Restart();
-                await _shards[i].ConnectAsync(waitForGuilds).ConfigureAwait(false);
-                if (i == 0)
-                    CurrentUser = _shards[i].CurrentUser;
-                sw.Stop();
-                _logEvent?.InvokeAsync(new LogMessage(LogSeverity.Warning, 
-                    "Client", 
-                    $"Shard #{_shards[i].ShardId} connected after {sw.Elapsed.TotalSeconds:F2}s ({++_connectedCount}/{_totalShards})"));
-            }
+            await Task.WhenAll(
+                _shards.Select(x => x.ConnectAsync(waitForGuilds))
+            ).ConfigureAwait(false);
+
+            CurrentUser = _shards[0].CurrentUser;
         }
         /// <inheritdoc />
         public async Task DisconnectAsync()
@@ -167,11 +163,11 @@ namespace Discord.WebSocket
         }
         public int GetShardIdFor(ulong guildId)
             => (int)((guildId >> 22) % (uint)_totalShards);
-        private int GetShardIdFor(IGuild guild)
+        public int GetShardIdFor(IGuild guild)
             => GetShardIdFor(guild.Id);
         private DiscordSocketClient GetShardFor(ulong guildId)
             => GetShard(GetShardIdFor(guildId));
-        private DiscordSocketClient GetShardFor(IGuild guild)
+        public DiscordSocketClient GetShardFor(IGuild guild)
             => GetShardFor(guild.Id);
 
         /// <inheritdoc />
@@ -293,6 +289,14 @@ namespace Discord.WebSocket
             }
         }
 
+        private int GetLatency()
+        {
+            int total = 0;
+            for (int i = 0; i < _shards.Length; i++)
+                total += _shards[i].Latency;
+            return (int)Math.Round(total / (double)_shards.Length);
+        }
+
         public async Task SetStatusAsync(UserStatus status)
         {
             for (int i = 0; i < _shards.Length; i++)
@@ -307,6 +311,17 @@ namespace Discord.WebSocket
         private void RegisterEvents(DiscordSocketClient client)
         {
             client.Log += (msg) => { _logEvent.InvokeAsync(msg); return Task.FromResult(0); };
+            client.LoggedOut += () =>
+            {
+                var state = LoginState;
+                if (state == LoginState.LoggedIn || state == LoginState.LoggingIn)
+                {
+                    //Should only happen if token is changed
+                    var _ = LogoutAsync(); //Signal the logout, fire and forget
+                }
+                return Task.Delay(0);
+            };
+
             client.ChannelCreated += (channel) => { _channelCreatedEvent.InvokeAsync(channel); return Task.FromResult(0); };
             client.ChannelDestroyed += (channel) => { _channelDestroyedEvent.InvokeAsync(channel); return Task.FromResult(0); };
             client.ChannelUpdated += (oldChannel, newChannel) => { _channelUpdatedEvent.InvokeAsync(oldChannel, newChannel); return Task.FromResult(0); };

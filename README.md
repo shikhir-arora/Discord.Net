@@ -1,9 +1,9 @@
 # Discord.Net v1.0.0-rc
 [![MyGet](https://img.shields.io/myget/discord-net/vpre/Discord.Net.svg)](https://www.myget.org/feed/Packages/discord-net) 
-[![MyGet Build Status](https://www.myget.org/BuildSource/Badge/discord-net?identifier=15bf7c42-22dd-4406-93e5-3cafc62bbc85)](https://www.myget.org/)
+[![Build status](https://ci.appveyor.com/api/projects/status/5sb7n8a09w9clute/branch/dev?svg=true)](https://ci.appveyor.com/project/RogueException/discord-net/branch/dev)
 [![Discord](https://discordapp.com/api/guilds/81384788765712384/widget.png)](https://discord.gg/0SBTUU1wZTVjAMPx)
 
-An unofficial .Net API Wrapper for the Discord client (http://discordapp.com).
+An unofficial .NET API Wrapper for the Discord client (http://discordapp.com).
 
 Check out the [documentation](https://discord.foxbot.me/docs/) or join the [Discord API Chat](https://discord.gg/0SBTUU1wZTVjAMPx).
 
@@ -29,15 +29,16 @@ Nightly builds are available through our MyGet feed (`https://www.myget.org/F/di
 In order to compile Discord.Net, you require the following:
 
 ### Using Visual Studio
-- [Visual Studio 2017 RC Build 26014.0](https://www.microsoft.com/net/core#windowsvs2017)
+- [Visual Studio 2017 RC](https://www.microsoft.com/net/core#windowsvs2017)
+- [.NET Core SDK 1.0 RC3](https://github.com/dotnet/core/blob/master/release-notes/rc3-download.md)
 
 The .NET Core and Docker (Preview) workload is required during Visual Studio installation.
 
 ### Using Command Line
-- [.Net Core 1.1 SDK](https://www.microsoft.com/net/download/core)
+- [.NET Core SDK 1.0 RC3](https://github.com/dotnet/core/blob/master/release-notes/rc3-download.md)
 
 ## Known Issues
 
 ### WebSockets (Win7 and earlier)
-.Net Core 1.1 does not support WebSockets on Win7 and earlier. It's recommended to use the Discord.Net.Providers.WS4Net package until this is resolved.
+.NET Core 1.1 does not support WebSockets on Win7 and earlier. It's recommended to use the Discord.Net.Providers.WS4Net package until this is resolved.
 Track the issue [here](https://github.com/dotnet/corefx/issues/9503).
