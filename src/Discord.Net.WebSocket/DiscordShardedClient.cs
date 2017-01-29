@@ -33,7 +33,7 @@ namespace Discord.WebSocket
         public IReadOnlyCollection<RestVoiceRegion> VoiceRegions => _shards[0].VoiceRegions;
 
         //my stuff
-        private uint _connectedCount = 0;
+        //private uint _connectedCount = 0;
         private uint _downloadedCount = 0;
         
         /// <summary> Creates a new REST/WebSocket discord client. </summary>
