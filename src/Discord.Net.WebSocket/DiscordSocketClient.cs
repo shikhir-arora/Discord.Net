@@ -18,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using GameModel = Discord.API.Game;
 using Discord.Net;
+using System.Diagnostics;
 
 namespace Discord.WebSocket
 {
@@ -165,7 +166,12 @@ namespace Discord.WebSocket
             await _connectionLock.WaitAsync().ConfigureAwait(false);
             try
             {
+                var sw = Stopwatch.StartNew();
                 await ConnectInternalAsync(false).ConfigureAwait(false);
+                sw.Stop();
+                _logEvent?.InvokeAsync(new LogMessage(LogSeverity.Warning,
+                    "Connection",
+                    $"Shard #{ShardId} connected after {sw.Elapsed.TotalSeconds:F2}s"));
             }
             finally { _connectionLock.Release(); }
         }
