@@ -34,7 +34,7 @@ namespace Discord.WebSocket
 
         //my stuff
         //private uint _connectedCount = 0;
-        private uint _downloadedCount = 0;
+        //private uint _downloadedCount = 0;
         
         /// <summary> Creates a new REST/WebSocket discord client. </summary>
         public DiscordShardedClient() : this(null, new DiscordSocketConfig()) { }
@@ -134,7 +134,15 @@ namespace Discord.WebSocket
         private async Task ConnectInternalAsync()
         {
             await Task.WhenAll(
-                _shards.Select(x => x.ConnectAsync())
+                _shards.Select(async x =>
+                {
+                    var sw = Stopwatch.StartNew();
+                    await x.ConnectAsync().ConfigureAwait(false);
+                    sw.Stop();
+                    _logEvent?.InvokeAsync(new LogMessage(LogSeverity.Warning, 
+                        "Connection", 
+                        $"Shard #{x.ShardId} connected after {sw.Elapsed.TotalSeconds:F2}s"));
+                })
             ).ConfigureAwait(false);
 
             CurrentUser = _shards[0].CurrentUser;
