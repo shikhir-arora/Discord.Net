@@ -291,7 +291,15 @@ namespace Discord.WebSocket
         public async Task SetGameAsync(string name, string streamUrl = null, StreamType streamType = StreamType.NotStreaming)
         {
             for (int i = 0; i < _shards.Length; i++)
-                await _shards[i].SetGameAsync(name, streamUrl, streamType).ConfigureAwait(false);
+            {
+                try
+                {
+                    await _shards[i].SetGameAsync(name, streamUrl, streamType).ConfigureAwait(false);
+                }
+                catch (Exception ex) {
+                    await _logEvent?.InvokeAsync(new LogMessage(LogSeverity.Warning, "DiscordShardedClient", "Setting game failed on shard " + i, ex));
+                }
+            }
         }
 
         private void RegisterEvents(DiscordSocketClient client)
