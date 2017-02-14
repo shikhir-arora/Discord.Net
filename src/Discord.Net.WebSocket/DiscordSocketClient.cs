@@ -245,8 +245,11 @@ namespace Discord.WebSocket
             {
                 if (_connectionGroupLock != null)
                 {
-                    await Task.Delay(5000).ConfigureAwait(false);
-                    _connectionGroupLock.Release();
+                    var _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(5000).ConfigureAwait(false);
+                        _connectionGroupLock.Release();
+                    });
                 }
             }
         }
