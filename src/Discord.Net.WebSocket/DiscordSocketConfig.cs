@@ -1,14 +1,15 @@
-﻿using Discord.Audio;
 using Discord.Net.Udp;
 using Discord.Net.WebSockets;
 using Discord.Rest;
-using System;
 
 namespace Discord.WebSocket
 {
     public class DiscordSocketConfig : DiscordRestConfig
     {
         public const string GatewayEncoding = "json";
+
+        /// <summary> Gets or sets the websocket host to connect to. If null, the client will use the /gateway endpoint. </summary>
+        public string GatewayHost { get; set; } = null;
 
         /// <summary> Gets or sets the time, in milliseconds, to wait for a connection to complete before aborting. </summary>
         public int ConnectionTimeout { get; set; } = 30000;
@@ -25,9 +26,6 @@ namespace Discord.WebSocket
         /// </summary>
         public int LargeThreshold { get; set; } = 250;
 
-        /// <summary> Gets or sets the type of audio this DiscordClient supports. </summary>
-        public AudioMode AudioMode { get; set; } = AudioMode.Disabled;
-
         /// <summary> Gets or sets the provider used to generate new websocket connections. </summary>
         public WebSocketProvider WebSocketProvider { get; set; }
         /// <summary> Gets or sets the provider used to generate new udp sockets. </summary>
@@ -38,41 +36,8 @@ namespace Discord.WebSocket
 
         public DiscordSocketConfig()
         {
-#if NETSTANDARD1_3
-            WebSocketProvider = () => 
-            {
-                try
-                {
-                    return new DefaultWebSocketClient();                    
-                }
-                catch (PlatformNotSupportedException ex)
-                {
-                    throw new PlatformNotSupportedException("The default websocket provider is not supported on this platform.", ex);
-                }
-            };
-            UdpSocketProvider = () => 
-            {
-                try
-                {
-                    return new DefaultUdpSocket();
-                }
-                catch (PlatformNotSupportedException ex)
-                {
-                    throw new PlatformNotSupportedException("The default UDP provider is not supported on this platform.", ex);
-                }
-            };
-#else
-            WebSocketProvider = () =>
-            {
-                throw new PlatformNotSupportedException("The default websocket provider is not supported on this platform.\n" +
-                    "You must specify a WebSocketProvider or target a runtime supporting .NET Standard 1.3, such as .NET Framework 4.6+.");
-            };
-            UdpSocketProvider = () =>
-            {
-                throw new PlatformNotSupportedException("The default UDP provider is not supported on this platform.\n" +
-                    "You must specify a UdpSocketProvider or target a runtime supporting .NET Standard 1.3, such as .NET Framework 4.6+.");
-            };
-#endif
+            WebSocketProvider = DefaultWebSocketProvider.Instance;
+            UdpSocketProvider = DefaultUdpSocketProvider.Instance;
         }
 
         internal DiscordSocketConfig Clone() => MemberwiseClone() as DiscordSocketConfig;
